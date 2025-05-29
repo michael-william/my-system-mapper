@@ -413,6 +413,66 @@ app.delete('/api/maps/:id/nodes/:nodeId', async (req, res) => {
     }
 });
 
+// Remove connection between nodes
+app.delete('/api/maps/:id/connections', async (req, res) => {
+    try {
+        const mapId = req.params.id;
+        const { source, target } = req.body;
+        
+        console.log(`📡 DELETE /api/maps/${mapId}/connections - Removing connection`);
+        console.log('📝 Connection to remove:', { source, target });
+        
+        if (!source || !target) {
+            return res.status(400).json({ error: 'Source and target are required' });
+        }
+        
+        const mapData = await redisClient.get(`map:${mapId}`);
+        if (!mapData) {
+            return res.status(404).json({ error: 'Map not found' });
+        }
+        
+        const map = JSON.parse(mapData);
+        const originalLinkCount = map.links.length;
+        
+        // Remove the specific link
+        map.links = map.links.filter(link => 
+            !(link.source === source && link.target === target)
+        );
+        
+        const removedCount = originalLinkCount - map.links.length;
+        
+        if (removedCount === 0) {
+            return res.status(404).json({ error: 'Connection not found' });
+        }
+        
+        map.updated = new Date().toISOString();
+        
+        // Update Redis
+        await redisClient.set(`map:${mapId}`, JSON.stringify(map));
+        
+        // Update metadata
+        await redisClient.hSet('maps:list', mapId, JSON.stringify({
+            id: mapId,
+            name: map.name,
+            description: map.description,
+            nodeCount: map.nodes.length,
+            updated: map.updated
+        }));
+        
+        console.log(`✅ Connection removed: ${source} -> ${target}`);
+        console.log(`📊 Links remaining: ${map.links.length}`);
+        
+        res.json({ 
+            message: 'Connection removed successfully',
+            removedConnection: { source, target },
+            remainingLinks: map.links.length
+        });
+    } catch (error) {
+        console.error('❌ Error removing connection:', error);
+        res.status(500).json({ error: 'Failed to remove connection' });
+    }
+});
+
 // Serve the main page
 app.get('/', (req, res) => {
     res.sendFile(path.join(__dirname, 'public', 'index.html'));
