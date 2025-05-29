@@ -357,14 +357,209 @@ function exportMap() {
     showMessage('Map exported successfully!');
 }
 
+// Enhanced Share Function with Embed Option
+// Replace your existing shareMap() function in ui.js with this:
+
 function shareMap() {
-    const shareUrl = window.location.href;
-    navigator.clipboard.writeText(shareUrl).then(() => {
-        showMessage('Share URL copied to clipboard!');
-    }).catch(() => {
-        showMessage(`Share this URL: ${shareUrl}`);
-    });
+    if (!window.currentMapData || !window.currentMapId) {
+        showMessage('No map selected to share', 'error');
+        return;
+    }
+
+    // Create a modal for share options
+    const shareModal = createShareModal();
+    document.body.appendChild(shareModal);
+    
+    // Show the modal
+    setTimeout(() => shareModal.classList.add('show'), 10);
 }
+
+function createShareModal() {
+    const modal = document.createElement('div');
+    modal.className = 'modal-overlay';
+    modal.id = 'shareModal';
+    
+    const currentUrl = window.location.href;
+    const mapUrl = `${window.location.origin}${window.location.pathname}?map=${window.currentMapId}`;
+    const embedCode = generateEmbedCode(mapUrl);
+    
+    modal.innerHTML = `
+        <div class="modal" onclick="event.stopPropagation()">
+            <div class="modal-header">
+                <h3 class="modal-title">Share Map</h3>
+                <button class="modal-close" onclick="closeShareModal()">&times;</button>
+            </div>
+            <div class="modal-content">
+                <div class="modal-section">
+                    <div class="modal-section-title">Direct Link</div>
+                    <div class="share-option">
+                        <label class="share-label">Map URL:</label>
+                        <div class="share-input-group">
+                            <input type="text" class="share-input" id="mapUrl" value="${mapUrl}" readonly>
+                            <button class="share-copy-btn" onclick="copyToClipboard('mapUrl', 'Map URL copied!')">
+                                📋 Copy
+                            </button>
+                        </div>
+                        <div class="share-description">
+                            Share this link to let others view your map directly
+                        </div>
+                    </div>
+                </div>
+                
+                <div class="modal-section">
+                    <div class="modal-section-title">Embed Code</div>
+                    <div class="share-option">
+                        <label class="share-label">HTML Embed:</label>
+                        <div class="share-input-group">
+                            <textarea class="share-textarea" id="embedCode" readonly>${embedCode}</textarea>
+                            <button class="share-copy-btn" onclick="copyToClipboard('embedCode', 'Embed code copied!')">
+                                📋 Copy
+                            </button>
+                        </div>
+                        <div class="share-description">
+                            Embed this map in your website or documentation
+                        </div>
+                    </div>
+                </div>
+                
+                <div class="modal-section">
+                    <div class="modal-section-title">Embed Options</div>
+                    <div class="embed-options">
+                        <div class="embed-option-group">
+                            <label class="embed-label">
+                                <input type="checkbox" id="embedReadonly" checked onchange="updateEmbedCode()">
+                                Read-only mode
+                            </label>
+                        </div>
+                        <div class="embed-option-group">
+                            <label class="embed-label">
+                                <input type="checkbox" id="embedHideTools" onchange="updateEmbedCode()">
+                                Hide side panel
+                            </label>
+                        </div>
+                        <div class="embed-option-group">
+                            <label class="embed-label">
+                                Width: <input type="text" class="embed-size-input" id="embedWidth" value="800" onchange="updateEmbedCode()">px
+                            </label>
+                        </div>
+                        <div class="embed-option-group">
+                            <label class="embed-label">
+                                Height: <input type="text" class="embed-size-input" id="embedHeight" value="600" onchange="updateEmbedCode()">px
+                            </label>
+                        </div>
+                    </div>
+                </div>
+                
+                <div class="modal-section">
+                    <div class="modal-section-title">Preview</div>
+                    <div class="embed-preview">
+                        <iframe id="embedPreview" src="${mapUrl}" width="400" height="300" frameborder="0"></iframe>
+                    </div>
+                </div>
+            </div>
+        </div>
+    `;
+    
+    // Close modal when clicking overlay
+    modal.onclick = (e) => {
+        if (e.target === modal) {
+            closeShareModal();
+        }
+    };
+    
+    return modal;
+}
+
+function generateEmbedCode(mapUrl) {
+    const readonly = document.getElementById('embedReadonly')?.checked ?? true;
+    const hideTools = document.getElementById('embedHideTools')?.checked ?? false;
+    const width = document.getElementById('embedWidth')?.value ?? '800';
+    const height = document.getElementById('embedHeight')?.value ?? '600';
+    
+    let embedUrl = mapUrl;
+    const params = [];
+    
+    if (readonly) params.push('readonly=true');
+    if (hideTools) params.push('hidetools=true');
+    
+    if (params.length > 0) {
+        embedUrl += (mapUrl.includes('?') ? '&' : '?') + params.join('&');
+    }
+    
+    return `<iframe src="${embedUrl}" width="${width}" height="${height}" frameborder="0" style="border: 1px solid #ccc; border-radius: 8px;"></iframe>`;
+}
+
+function updateEmbedCode() {
+    const mapUrl = `${window.location.origin}${window.location.pathname}?map=${window.currentMapId}`;
+    const newEmbedCode = generateEmbedCode(mapUrl);
+    
+    const embedCodeElement = document.getElementById('embedCode');
+    const previewElement = document.getElementById('embedPreview');
+    
+    if (embedCodeElement) {
+        embedCodeElement.value = newEmbedCode;
+    }
+    
+    if (previewElement) {
+        // Update preview iframe
+        const readonly = document.getElementById('embedReadonly').checked;
+        const hideTools = document.getElementById('embedHideTools').checked;
+        const width = document.getElementById('embedWidth').value;
+        const height = document.getElementById('embedHeight').value;
+        
+        let previewUrl = mapUrl;
+        const params = [];
+        
+        if (readonly) params.push('readonly=true');
+        if (hideTools) params.push('hidetools=true');
+        
+        if (params.length > 0) {
+            previewUrl += (mapUrl.includes('?') ? '&' : '?') + params.join('&');
+        }
+        
+        previewElement.src = previewUrl;
+        previewElement.width = Math.min(400, parseInt(width) / 2);
+        previewElement.height = Math.min(300, parseInt(height) / 2);
+    }
+}
+
+function copyToClipboard(elementId, successMessage) {
+    const element = document.getElementById(elementId);
+    if (!element) return;
+    
+    element.select();
+    element.setSelectionRange(0, 99999); // For mobile devices
+    
+    try {
+        document.execCommand('copy');
+        showMessage(successMessage || 'Copied to clipboard!');
+    } catch (err) {
+        // Fallback for modern browsers
+        navigator.clipboard.writeText(element.value).then(() => {
+            showMessage(successMessage || 'Copied to clipboard!');
+        }).catch(() => {
+            showMessage('Failed to copy to clipboard', 'error');
+        });
+    }
+}
+
+function closeShareModal() {
+    const modal = document.getElementById('shareModal');
+    if (modal) {
+        modal.classList.remove('show');
+        setTimeout(() => {
+            if (modal.parentNode) {
+                modal.parentNode.removeChild(modal);
+            }
+        }, 300);
+    }
+}
+
+// Make functions available globally
+window.shareMap = shareMap;
+window.closeShareModal = closeShareModal;
+window.copyToClipboard = copyToClipboard;
+window.updateEmbedCode = updateEmbedCode;
 
 function saveMap() {
     showMessage('Map saved automatically!');

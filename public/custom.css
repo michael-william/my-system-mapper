@@ -1322,6 +1322,382 @@ body.dark .node-tooltip {
     text-shadow: 0 0 10px rgba(102, 126, 234, 0.3);
 }
 
+/* DARK MODE CLEANUP - Add/Replace these styles in your custom.css */
+
+/* Remove any conflicting dark mode overrides and use consistent styling */
+
+/* Ensure all inputs use the glassy style consistently */
+.config-input, .config-select, .map-select, 
+.attribute-name-input, .attribute-value-input {
+    width: 100%;
+    padding: 8px 12px;
+    border: 1px solid rgba(102, 126, 234, 0.3);
+    border-radius: 6px;
+    background: rgba(255, 255, 255, 0.05) !important;
+    backdrop-filter: blur(10px);
+    color: #e5e5e5 !important;
+    font-size: 14px;
+    transition: all 0.2s ease;
+}
+
+/* Remove the old dark mode overrides that conflict */
+body.dark .config-input,
+body.dark .config-select,
+body.dark .map-select,
+body.dark .attribute-name-input,
+body.dark .attribute-value-input {
+    background: rgba(255, 255, 255, 0.05) !important;
+    border: 1px solid rgba(102, 126, 234, 0.3) !important;
+    color: #e5e5e5 !important;
+}
+
+/* Focus states for all inputs */
+.config-input:focus, .config-select:focus, .map-select:focus,
+.attribute-name-input:focus, .attribute-value-input:focus {
+    outline: none;
+    border-color: rgba(102, 126, 234, 0.8) !important;
+    box-shadow: 0 0 0 3px rgba(102, 126, 234, 0.2);
+    background: rgba(255, 255, 255, 0.1) !important;
+}
+
+/* Fix tool icons - make them more visible */
+.tool-icon {
+    width: 20px;
+    height: 20px;
+    background: linear-gradient(135deg, rgba(102, 126, 234, 0.6) 0%, rgba(118, 75, 162, 0.6) 100%);
+    border-radius: 4px;
+    flex-shrink: 0;
+    border: 1px solid rgba(102, 126, 234, 0.4);
+}
+
+/* Ensure labels are visible */
+.config-label, .modal-section-title, .attributes-title {
+    display: block;
+    font-size: 12px;
+    font-weight: 600;
+    color: rgba(102, 126, 234, 0.9) !important;
+    margin-bottom: 6px;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    text-shadow: 0 0 10px rgba(102, 126, 234, 0.3);
+}
+
+/* Fix section headers in tools */
+.tool-section h3 {
+    font-size: 14px;
+    font-weight: 600;
+    margin-bottom: 12px;
+    color: rgba(102, 126, 234, 0.9) !important;
+    opacity: 1;
+    transition: opacity 0.2s ease;
+    text-shadow: 0 0 10px rgba(102, 126, 234, 0.3);
+}
+
+/* Remove old dark mode override */
+body.dark .tool-section h3 {
+    color: rgba(102, 126, 234, 0.9) !important;
+}
+
+/* Ensure all text is properly visible */
+.panel-title {
+    font-weight: 600;
+    font-size: 16px;
+    opacity: 1;
+    transition: opacity 0.2s ease;
+    color: #e5e5e5 !important;
+    text-shadow: 0 0 10px rgba(102, 126, 234, 0.3);
+}
+
+/* Fix tool text visibility */
+.tool-text {
+    opacity: 1;
+    transition: opacity 0.2s ease;
+    color: #e5e5e5 !important;
+}
+
+/* Remove old dark mode conflicts */
+body.dark .tool-text,
+body.dark .panel-title {
+    color: #e5e5e5 !important;
+}
+
+/* Ensure placeholders are visible */
+.config-input::placeholder,
+.attribute-name-input::placeholder,
+.attribute-value-input::placeholder {
+    color: rgba(229, 229, 229, 0.5) !important;
+    font-size: 12px;
+}
+
+/* Fix dropdown arrows and select styling */
+.config-select {
+    -webkit-appearance: none;
+    -moz-appearance: none;
+    appearance: none;
+    background-image: url("data:image/svg+xml;charset=UTF-8,%3csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='rgba(102, 126, 234, 0.8)' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3e%3cpolyline points='6,9 12,15 18,9'%3e%3c/polyline%3e%3c/svg%3e");
+    background-repeat: no-repeat;
+    background-position: right 12px center;
+    background-size: 16px;
+    padding-right: 40px;
+}
+
+/* Fix option styling for dropdowns */
+.config-select option {
+    background: rgba(26, 26, 46, 0.95);
+    color: #e5e5e5;
+    padding: 8px;
+}
+
+/* Remove any conflicting action button styles */
+body.dark .action-btn,
+body.dark .map-action-btn {
+    background: rgba(255, 255, 255, 0.05) !important;
+    border: 1px solid rgba(102, 126, 234, 0.3) !important;
+    color: #e5e5e5 !important;
+}
+
+body.dark .action-btn:hover,
+body.dark .map-action-btn:hover {
+    background: rgba(102, 126, 234, 0.2) !important;
+    border-color: rgba(102, 126, 234, 0.6) !important;
+}
+
+/* Ensure node config sections are visible */
+.node-config.active,
+.edit-node-config.active {
+    display: block;
+    background: rgba(255, 255, 255, 0.02) !important;
+    border: 1px solid rgba(102, 126, 234, 0.2) !important;
+    backdrop-filter: blur(10px);
+}
+
+/* Remove old dark mode overrides for node config */
+body.dark .node-config,
+body.dark .edit-node-config {
+    background: rgba(255, 255, 255, 0.02) !important;
+    border: 1px solid rgba(102, 126, 234, 0.2) !important;
+}
+
+/* Fix attribute item styling */
+body.dark .attribute-item {
+    background: rgba(255, 255, 255, 0.03) !important;
+    border: 1px solid rgba(102, 126, 234, 0.2) !important;
+}
+
+/* Ensure remove buttons are visible */
+.remove-attribute-btn,
+.remove-parent-btn,
+.add-attribute-btn {
+    background: linear-gradient(135deg, rgba(220, 53, 69, 0.8), rgba(180, 40, 55, 0.8)) !important;
+    border: 1px solid rgba(220, 53, 69, 0.5);
+    color: white !important;
+}
+
+.add-attribute-btn {
+    background: linear-gradient(135deg, rgba(102, 126, 234, 0.8), rgba(118, 75, 162, 0.8)) !important;
+    border: 1px solid rgba(102, 126, 234, 0.5);
+}
+
+/* Clean up any remaining dark mode conflicts */
+body.dark {
+    background: radial-gradient(ellipse at center, #1a1a2e 0%, #16213e 50%, #0f0f23 100%) !important;
+    color: #e5e5e5 !important;
+}
+
+/* Make sure canvas area is transparent */
+body.dark .canvas-area {
+    background: transparent !important;
+}
+
+/* Add these styles to your custom.css for the share modal */
+
+/* Share Modal Specific Styles */
+#shareModal .modal {
+    max-width: 600px;
+    width: 95vw;
+    max-height: 90vh;
+}
+
+.share-option {
+    margin-bottom: 16px;
+}
+
+.share-label {
+    display: block;
+    font-size: 12px;
+    font-weight: 600;
+    color: rgba(102, 126, 234, 0.9);
+    margin-bottom: 6px;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+}
+
+.share-input-group {
+    display: flex;
+    gap: 8px;
+    align-items: flex-start;
+}
+
+.share-input, .share-textarea {
+    flex: 1;
+    padding: 10px 12px;
+    border: 1px solid rgba(102, 126, 234, 0.3);
+    border-radius: 6px;
+    background: rgba(255, 255, 255, 0.05);
+    backdrop-filter: blur(10px);
+    color: #e5e5e5;
+    font-size: 13px;
+    font-family: 'Courier New', monospace;
+    resize: none;
+}
+
+.share-textarea {
+    min-height: 80px;
+    resize: vertical;
+}
+
+.share-input:focus, .share-textarea:focus {
+    outline: none;
+    border-color: rgba(102, 126, 234, 0.8);
+    box-shadow: 0 0 0 3px rgba(102, 126, 234, 0.2);
+    background: rgba(255, 255, 255, 0.1);
+}
+
+.share-copy-btn {
+    padding: 10px 16px;
+    background: linear-gradient(135deg, rgba(102, 126, 234, 0.8) 0%, rgba(118, 75, 162, 0.8) 100%);
+    border: 1px solid rgba(102, 126, 234, 0.5);
+    border-radius: 6px;
+    color: white;
+    font-size: 12px;
+    cursor: pointer;
+    transition: all 0.2s ease;
+    white-space: nowrap;
+    backdrop-filter: blur(10px);
+}
+
+.share-copy-btn:hover {
+    background: linear-gradient(135deg, rgba(102, 126, 234, 1) 0%, rgba(118, 75, 162, 1) 100%);
+    transform: translateY(-1px);
+    box-shadow: 0 4px 15px rgba(102, 126, 234, 0.4);
+}
+
+.share-description {
+    font-size: 11px;
+    color: rgba(229, 229, 229, 0.7);
+    margin-top: 4px;
+    font-style: italic;
+}
+
+/* Embed Options Styling */
+.embed-options {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 12px;
+}
+
+.embed-option-group {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.embed-label {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    font-size: 13px;
+    color: #e5e5e5;
+    cursor: pointer;
+}
+
+.embed-label input[type="checkbox"] {
+    width: 16px;
+    height: 16px;
+    accent-color: rgba(102, 126, 234, 0.8);
+    cursor: pointer;
+}
+
+.embed-size-input {
+    width: 60px;
+    padding: 4px 6px;
+    border: 1px solid rgba(102, 126, 234, 0.3);
+    border-radius: 4px;
+    background: rgba(255, 255, 255, 0.05);
+    color: #e5e5e5;
+    font-size: 12px;
+    text-align: center;
+}
+
+.embed-size-input:focus {
+    outline: none;
+    border-color: rgba(102, 126, 234, 0.8);
+    box-shadow: 0 0 0 2px rgba(102, 126, 234, 0.2);
+}
+
+/* Embed Preview */
+.embed-preview {
+    border: 1px solid rgba(102, 126, 234, 0.3);
+    border-radius: 8px;
+    padding: 12px;
+    background: rgba(255, 255, 255, 0.02);
+    backdrop-filter: blur(5px);
+    text-align: center;
+}
+
+.embed-preview iframe {
+    border: 1px solid rgba(102, 126, 234, 0.4);
+    border-radius: 6px;
+    background: #fff;
+    max-width: 100%;
+}
+
+/* Responsive adjustments */
+@media (max-width: 640px) {
+    #shareModal .modal {
+        width: 98vw;
+        margin: 10px;
+    }
+    
+    .share-input-group {
+        flex-direction: column;
+    }
+    
+    .share-copy-btn {
+        align-self: flex-end;
+    }
+    
+    .embed-options {
+        grid-template-columns: 1fr;
+    }
+    
+    .embed-preview iframe {
+        width: 100%;
+        height: 200px;
+    }
+}
+
+/* Animation for the share modal */
+#shareModal {
+    opacity: 0;
+    visibility: hidden;
+    transition: all 0.3s ease;
+}
+
+#shareModal.show {
+    opacity: 1;
+    visibility: visible;
+}
+
+#shareModal .modal {
+    transform: scale(0.8) translateY(30px);
+    transition: all 0.3s cubic-bezier(0.34, 1.56, 0.64, 1);
+}
+
+#shareModal.show .modal {
+    transform: scale(1) translateY(0);
+}
+
 /* Responsive */
 @media (max-width: 768px) {
     .side-panel {
