@@ -562,7 +562,231 @@ app.use((err, req, res, next) => {
     res.status(500).json({ error: 'Something went wrong!' });
 });
 
-// Handle 404s
+// Debug embed endpoint with better error handling
+app.get('/embed', (req, res) => {
+    console.log('📡 GET /embed - Request received');
+    console.log('📝 Query params:', req.query);
+    
+    const mapId = req.query.map || 'default';
+    console.log(`🗺️ Loading map: ${mapId}`);
+    
+    const embedHTML = `<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>System Map Embed</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            background: radial-gradient(ellipse at center, #1a1a2e 0%, #16213e 50%, #0f0f23 100%);
+            height: 100vh; overflow: hidden; color: #e5e5e5;
+        }
+        .embed-container { width: 100%; height: 100vh; position: relative; overflow: hidden; }
+        .embed-container svg { width: 100%; height: 100%; display: block; }
+        .node-tooltip {
+            position: absolute; background: rgba(0, 0, 0, 0.9); color: white;
+            padding: 8px 12px; border-radius: 6px; font-size: 12px; font-weight: 500;
+            pointer-events: none; z-index: 100; opacity: 0; transition: opacity 0.2s ease;
+            white-space: nowrap; border: 1px solid rgba(102, 126, 234, 0.5);
+            backdrop-filter: blur(10px);
+        }
+        .embed-watermark {
+            position: absolute; bottom: 10px; right: 10px; font-size: 10px;
+            color: rgba(102, 126, 234, 0.6); pointer-events: none; z-index: 1000;
+        }
+        .loading {
+            position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%);
+            text-align: center; color: rgba(102, 126, 234, 0.8);
+        }
+        .loading-spinner {
+            width: 40px; height: 40px; border: 3px solid rgba(102, 126, 234, 0.3);
+            border-top: 3px solid rgba(102, 126, 234, 0.8); border-radius: 50%;
+            animation: spin 1s linear infinite; margin: 0 auto 16px;
+        }
+        @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
+        .error { color: #dc3545; }
+        .debug { position: absolute; top: 10px; left: 10px; font-size: 10px; background: rgba(0,0,0,0.7); padding: 5px; border-radius: 3px; }
+    </style>
+</head>
+<body>
+    <div class="embed-container">
+        <div class="debug">Map ID: ${mapId}</div>
+        <div class="loading" id="loadingState">
+            <div class="loading-spinner"></div>
+            <div>Loading map...</div>
+        </div>
+        <svg></svg>
+        <div class="node-tooltip" id="nodeTooltip"></div>
+        <div class="embed-watermark">System Map</div>
+    </div>
+
+    <script src="https://d3js.org/d3.v7.min.js"></script>
+    <script>
+        let simulation = null;
+        let currentMapData = null;
+        const mapId = '${mapId}';
+        
+        console.log('🚀 Embed page loading for map:', mapId);
+
+        async function loadMapData() {
+            try {
+                console.log('📡 Fetching map data from:', \`/api/maps/\${mapId}\`);
+                
+                const response = await fetch(\`/api/maps/\${mapId}\`);
+                console.log('📊 Response status:', response.status);
+                
+                if (!response.ok) {
+                    const errorText = await response.text();
+                    console.error('❌ API Error:', errorText);
+                    throw new Error(\`HTTP \${response.status}: \${errorText}\`);
+                }
+                
+                currentMapData = await response.json();
+                console.log('✅ Map data loaded:', currentMapData);
+                console.log('📊 Nodes:', currentMapData.nodes?.length || 0);
+                console.log('📊 Links:', currentMapData.links?.length || 0);
+                
+                document.getElementById('loadingState').style.display = 'none';
+                
+                if (!currentMapData.nodes || currentMapData.nodes.length === 0) {
+                    throw new Error('No nodes found in map data');
+                }
+                
+                initVisualization();
+            } catch (error) {
+                console.error('❌ Error loading map:', error);
+                document.getElementById('loadingState').innerHTML = \`
+                    <div class="error">
+                        <div style="font-size: 24px; margin-bottom: 16px;">⚠️</div>
+                        <div>Failed to load map</div>
+                        <div style="font-size: 10px; margin-top: 8px;">\${error.message}</div>
+                        <div style="font-size: 10px; margin-top: 4px;">Map ID: \${mapId}</div>
+                    </div>
+                \`;
+            }
+        }
+
+        function initVisualization() {
+            console.log('🎨 Initializing visualization...');
+            
+            if (!currentMapData || !currentMapData.nodes) {
+                console.error('❌ No map data available for visualization');
+                return;
+            }
+
+            const width = window.innerWidth;
+            const height = window.innerHeight;
+            console.log('📐 Canvas size:', width, 'x', height);
+            
+            const colorScale = d3.scaleOrdinal([
+                '#667eea', '#764ba2', '#f093fb', '#f5576c', 
+                '#4facfe', '#00f2fe', '#43e97b', '#38f9d7'
+            ]);
+            
+            const svg = d3.select("svg").attr("viewBox", [0, 0, width, height]);
+            svg.selectAll("*").remove();
+
+            const defs = svg.append("defs");
+            
+            // Add glow filter
+            const nodeGlow = defs.append("filter").attr("id", "nodeGlow")
+                .attr("x", "-50%").attr("y", "-50%").attr("width", "200%").attr("height", "200%");
+            nodeGlow.append("feGaussianBlur").attr("stdDeviation", "3").attr("result", "coloredBlur");
+            const nodeMerge = nodeGlow.append("feMerge");
+            nodeMerge.append("feMergeNode").attr("in", "coloredBlur");
+            nodeMerge.append("feMergeNode").attr("in", "SourceGraphic");
+
+            // Add link gradient
+            const linkGradient = defs.append("linearGradient").attr("id", "linkGradient");
+            linkGradient.append("stop").attr("offset", "0%").attr("stop-color", "#667eea").attr("stop-opacity", 0.8);
+            linkGradient.append("stop").attr("offset", "100%").attr("stop-color", "#764ba2").attr("stop-opacity", 0.4);
+
+            const container = svg.append("g");
+            const zoom = d3.zoom().scaleExtent([0.1, 4])
+                .on("zoom", ({transform}) => container.attr("transform", transform));
+            svg.call(zoom);
+
+            // Create simulation
+            simulation = d3.forceSimulation(currentMapData.nodes)
+                .force("link", d3.forceLink(currentMapData.links).id(d => d.id).distance(120))
+                .force("charge", d3.forceManyBody().strength(-400))
+                .force("center", d3.forceCenter(width / 2, height / 2));
+
+            // Create links
+            const link = container.append("g").selectAll("line")
+                .data(currentMapData.links).join("line")
+                .attr("stroke", "url(#linkGradient)")
+                .attr("stroke-width", 2).attr("stroke-opacity", 0.6);
+
+            // Create nodes
+            const node = container.append("g").selectAll("circle")
+                .data(currentMapData.nodes).join("circle")
+                .attr("r", 15).attr("fill", d => colorScale(d.group))
+                .attr("stroke", "#ffffff").attr("stroke-width", 2)
+                .style("cursor", "pointer");
+
+            // Create labels
+            const label = container.append("g").selectAll("text")
+                .data(currentMapData.nodes).join("text")
+                .text(d => d.id).attr("text-anchor", "middle")
+                .attr("fill", "#ffffff").attr("font-size", "11px")
+                .style("pointer-events", "none");
+
+            // Simulation tick
+            simulation.on("tick", () => {
+                link.attr("x1", d => d.source.x).attr("y1", d => d.source.y)
+                    .attr("x2", d => d.target.x).attr("y2", d => d.target.y);
+                node.attr("cx", d => d.x).attr("cy", d => d.y);
+                label.attr("x", d => d.x).attr("y", d => d.y + 25);
+            });
+            
+            console.log('✅ Visualization initialized successfully');
+        }
+
+        window.addEventListener('resize', () => {
+            if (currentMapData) initVisualization();
+        });
+
+        // Start loading
+        loadMapData();
+    </script>
+</body>
+</html>`;
+
+    console.log('📤 Sending embed HTML response');
+    res.send(embedHTML);
+});
+
+// Also add a simple test endpoint to check if maps are available
+app.get('/api/test/maps', async (req, res) => {
+    try {
+        console.log('🧪 Testing maps availability...');
+        
+        const mapsData = await redisClient.hGetAll('maps:list');
+        const maps = Object.values(mapsData).map(mapStr => JSON.parse(mapStr));
+        
+        console.log(`📊 Found ${maps.length} maps in Redis`);
+        maps.forEach(map => {
+            console.log(`  - ${map.id}: ${map.name} (${map.nodeCount} nodes)`);
+        });
+        
+        res.json({
+            status: 'success',
+            mapCount: maps.length,
+            maps: maps
+        });
+    } catch (error) {
+        console.error('❌ Error testing maps:', error);
+        res.status(500).json({ 
+            status: 'error', 
+            error: error.message 
+        });
+    }
+});
+
+// Handle 404s (must be after all routes)
 app.use((req, res) => {
     res.status(404).json({ error: 'Not found' });
 });

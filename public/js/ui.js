@@ -360,17 +360,16 @@ function exportMap() {
 // Enhanced Share Function with Embed Option
 // Replace your existing shareMap() function in ui.js with this:
 
+// Updated Share Function - Replace your existing shareMap() function with this:
+
 function shareMap() {
     if (!window.currentMapData || !window.currentMapId) {
         showMessage('No map selected to share', 'error');
         return;
     }
 
-    // Create a modal for share options
     const shareModal = createShareModal();
     document.body.appendChild(shareModal);
-    
-    // Show the modal
     setTimeout(() => shareModal.classList.add('show'), 10);
 }
 
@@ -381,35 +380,52 @@ function createShareModal() {
     
     const currentUrl = window.location.href;
     const mapUrl = `${window.location.origin}${window.location.pathname}?map=${window.currentMapId}`;
-    const embedCode = generateEmbedCode(mapUrl);
+    const embedUrl = `${window.location.origin}/embed?map=${window.currentMapId}`;
+    const embedCode = generateEmbedCode(embedUrl);
     
     modal.innerHTML = `
         <div class="modal" onclick="event.stopPropagation()">
             <div class="modal-header">
-                <h3 class="modal-title">Share Map</h3>
+                <h3 class="modal-title">📤 Share Map</h3>
                 <button class="modal-close" onclick="closeShareModal()">&times;</button>
             </div>
             <div class="modal-content">
                 <div class="modal-section">
-                    <div class="modal-section-title">Direct Link</div>
+                    <div class="modal-section-title">🔗 Direct Link</div>
                     <div class="share-option">
-                        <label class="share-label">Map URL:</label>
+                        <label class="share-label">Full Application URL:</label>
                         <div class="share-input-group">
                             <input type="text" class="share-input" id="mapUrl" value="${mapUrl}" readonly>
-                            <button class="share-copy-btn" onclick="copyToClipboard('mapUrl', 'Map URL copied!')">
+                            <button class="share-copy-btn" onclick="copyToClipboard('mapUrl', 'Full app URL copied!')">
                                 📋 Copy
                             </button>
                         </div>
                         <div class="share-description">
-                            Share this link to let others view your map directly
+                            Share this link to let others view and edit your map
                         </div>
                     </div>
                 </div>
                 
                 <div class="modal-section">
-                    <div class="modal-section-title">Embed Code</div>
+                    <div class="modal-section-title">🎯 Visualization Only</div>
                     <div class="share-option">
-                        <label class="share-label">HTML Embed:</label>
+                        <label class="share-label">D3.js Graph URL:</label>
+                        <div class="share-input-group">
+                            <input type="text" class="share-input" id="embedUrl" value="${embedUrl}" readonly>
+                            <button class="share-copy-btn" onclick="copyToClipboard('embedUrl', 'Visualization URL copied!')">
+                                📋 Copy
+                            </button>
+                        </div>
+                        <div class="share-description">
+                            Direct link to just the interactive graph visualization
+                        </div>
+                    </div>
+                </div>
+                
+                <div class="modal-section">
+                    <div class="modal-section-title">🖼️ Embed Code</div>
+                    <div class="share-option">
+                        <label class="share-label">HTML Embed Code:</label>
                         <div class="share-input-group">
                             <textarea class="share-textarea" id="embedCode" readonly>${embedCode}</textarea>
                             <button class="share-copy-btn" onclick="copyToClipboard('embedCode', 'Embed code copied!')">
@@ -417,24 +433,18 @@ function createShareModal() {
                             </button>
                         </div>
                         <div class="share-description">
-                            Embed this map in your website or documentation
+                            Embed the visualization in your website or documentation
                         </div>
                     </div>
                 </div>
                 
                 <div class="modal-section">
-                    <div class="modal-section-title">Embed Options</div>
+                    <div class="modal-section-title">⚙️ Embed Options</div>
                     <div class="embed-options">
                         <div class="embed-option-group">
                             <label class="embed-label">
-                                <input type="checkbox" id="embedReadonly" checked onchange="updateEmbedCode()">
-                                Read-only mode
-                            </label>
-                        </div>
-                        <div class="embed-option-group">
-                            <label class="embed-label">
-                                <input type="checkbox" id="embedHideTools" onchange="updateEmbedCode()">
-                                Hide side panel
+                                <input type="checkbox" id="embedWatermark" checked onchange="updateEmbedCode()">
+                                Show watermark
                             </label>
                         </div>
                         <div class="embed-option-group">
@@ -447,20 +457,25 @@ function createShareModal() {
                                 Height: <input type="text" class="embed-size-input" id="embedHeight" value="600" onchange="updateEmbedCode()">px
                             </label>
                         </div>
+                        <div class="embed-option-group">
+                            <label class="embed-label">
+                                <input type="checkbox" id="embedResponsive" onchange="updateEmbedCode()">
+                                Responsive (100% width)
+                            </label>
+                        </div>
                     </div>
                 </div>
                 
                 <div class="modal-section">
-                    <div class="modal-section-title">Preview</div>
+                    <div class="modal-section-title">👀 Preview</div>
                     <div class="embed-preview">
-                        <iframe id="embedPreview" src="${mapUrl}" width="400" height="300" frameborder="0"></iframe>
+                        <iframe id="embedPreview" src="${embedUrl}" width="400" height="300" frameborder="0" style="border: 1px solid rgba(102, 126, 234, 0.4); border-radius: 6px;"></iframe>
                     </div>
                 </div>
             </div>
         </div>
     `;
     
-    // Close modal when clicking overlay
     modal.onclick = (e) => {
         if (e.target === modal) {
             closeShareModal();
@@ -470,56 +485,67 @@ function createShareModal() {
     return modal;
 }
 
-function generateEmbedCode(mapUrl) {
-    const readonly = document.getElementById('embedReadonly')?.checked ?? true;
-    const hideTools = document.getElementById('embedHideTools')?.checked ?? false;
+function generateEmbedCode(baseEmbedUrl) {
+    const showWatermark = document.getElementById('embedWatermark')?.checked ?? true;
     const width = document.getElementById('embedWidth')?.value ?? '800';
     const height = document.getElementById('embedHeight')?.value ?? '600';
+    const responsive = document.getElementById('embedResponsive')?.checked ?? false;
     
-    let embedUrl = mapUrl;
+    let embedUrl = baseEmbedUrl;
     const params = [];
     
-    if (readonly) params.push('readonly=true');
-    if (hideTools) params.push('hidetools=true');
+    if (!showWatermark) params.push('watermark=false');
     
     if (params.length > 0) {
-        embedUrl += (mapUrl.includes('?') ? '&' : '?') + params.join('&');
+        embedUrl += (baseEmbedUrl.includes('?') ? '&' : '?') + params.join('&');
     }
     
-    return `<iframe src="${embedUrl}" width="${width}" height="${height}" frameborder="0" style="border: 1px solid #ccc; border-radius: 8px;"></iframe>`;
+    if (responsive) {
+        return `<iframe src="${embedUrl}" width="100%" height="${height}" frameborder="0" style="border: 1px solid #ccc; border-radius: 8px; min-width: 300px;"></iframe>`;
+    } else {
+        return `<iframe src="${embedUrl}" width="${width}" height="${height}" frameborder="0" style="border: 1px solid #ccc; border-radius: 8px;"></iframe>`;
+    }
 }
 
 function updateEmbedCode() {
-    const mapUrl = `${window.location.origin}${window.location.pathname}?map=${window.currentMapId}`;
-    const newEmbedCode = generateEmbedCode(mapUrl);
+    const baseEmbedUrl = `${window.location.origin}/embed?map=${window.currentMapId}`;
+    const newEmbedCode = generateEmbedCode(baseEmbedUrl);
     
     const embedCodeElement = document.getElementById('embedCode');
     const previewElement = document.getElementById('embedPreview');
+    const embedUrlElement = document.getElementById('embedUrl');
     
     if (embedCodeElement) {
         embedCodeElement.value = newEmbedCode;
     }
     
-    if (previewElement) {
-        // Update preview iframe
-        const readonly = document.getElementById('embedReadonly').checked;
-        const hideTools = document.getElementById('embedHideTools').checked;
+    if (previewElement && embedUrlElement) {
+        const showWatermark = document.getElementById('embedWatermark').checked;
         const width = document.getElementById('embedWidth').value;
         const height = document.getElementById('embedHeight').value;
+        const responsive = document.getElementById('embedResponsive').checked;
         
-        let previewUrl = mapUrl;
+        let previewUrl = baseEmbedUrl;
         const params = [];
         
-        if (readonly) params.push('readonly=true');
-        if (hideTools) params.push('hidetools=true');
+        if (!showWatermark) params.push('watermark=false');
         
         if (params.length > 0) {
-            previewUrl += (mapUrl.includes('?') ? '&' : '?') + params.join('&');
+            previewUrl += (baseEmbedUrl.includes('?') ? '&' : '?') + params.join('&');
         }
         
+        // Update the embed URL input
+        embedUrlElement.value = previewUrl;
+        
+        // Update preview iframe
         previewElement.src = previewUrl;
-        previewElement.width = Math.min(400, parseInt(width) / 2);
-        previewElement.height = Math.min(300, parseInt(height) / 2);
+        if (responsive) {
+            previewElement.width = 400;
+            previewElement.height = Math.min(300, parseInt(height) / 2);
+        } else {
+            previewElement.width = Math.min(400, parseInt(width) / 2);
+            previewElement.height = Math.min(300, parseInt(height) / 2);
+        }
     }
 }
 
@@ -528,13 +554,12 @@ function copyToClipboard(elementId, successMessage) {
     if (!element) return;
     
     element.select();
-    element.setSelectionRange(0, 99999); // For mobile devices
+    element.setSelectionRange(0, 99999);
     
     try {
         document.execCommand('copy');
         showMessage(successMessage || 'Copied to clipboard!');
     } catch (err) {
-        // Fallback for modern browsers
         navigator.clipboard.writeText(element.value).then(() => {
             showMessage(successMessage || 'Copied to clipboard!');
         }).catch(() => {
@@ -560,6 +585,7 @@ window.shareMap = shareMap;
 window.closeShareModal = closeShareModal;
 window.copyToClipboard = copyToClipboard;
 window.updateEmbedCode = updateEmbedCode;
+
 
 function saveMap() {
     showMessage('Map saved automatically!');
