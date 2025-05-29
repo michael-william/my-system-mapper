@@ -69,9 +69,19 @@ function initVisualization() {
             // Hide tooltip when modal opens
             nodeTooltip.style("opacity", 0);
             
-            // Open modal with node details
-            openNodeModal(d);
-        });
+            // Check if Ctrl/Cmd key is held for debug mode
+            if (event.ctrlKey || event.metaKey) {
+                console.log('🔍 Debug mode - Node data:', d);
+                console.log('🔍 All connections for this node:', 
+                    window.currentMapData.links.filter(l => 
+                        l.source === d.id || l.target === d.id
+                    )
+                );
+            }
+            
+            // Open enhanced modal with API data
+            openNodeModalWithConnections(d);
+        })
 
     const label = LXC.append("g")
         .selectAll("text")
@@ -320,6 +330,372 @@ function closeNodeModal(event) {
     // Restore body scroll
     document.body.style.overflow = '';
 }
+
+// Add these functions to your visualization.js file or create a new file
+
+// Enhanced modal functionality with API integration
+async function openNodeModalWithConnections(nodeData) {
+    const modal = document.getElementById('nodeModal');
+    const modalTitle = document.getElementById('modalTitle');
+    const modalContent = document.getElementById('modalContent');
+    
+    // Set modal title
+    modalTitle.textContent = nodeData.id;
+    
+    // Show loading state
+    modalContent.innerHTML = `
+        <div style="text-align: center; padding: 40px;">
+            <div style="font-size: 24px; margin-bottom: 16px;">⏳</div>
+            <div>Loading node details...</div>
+        </div>
+    `;
+    
+    // Show modal immediately with loading state
+    modal.classList.add('show');
+    document.body.style.overflow = 'hidden';
+    
+    try {
+        // Fetch detailed connection data from API
+        const response = await fetch(`/api/maps/${window.currentMapId}/nodes/${nodeData.id}/connections`);
+        
+        if (!response.ok) {
+            throw new Error('Failed to fetch node connections');
+        }
+        
+        const connectionData = await response.json();
+        
+        // Build enhanced modal content
+        let content = buildEnhancedModalContent(nodeData, connectionData);
+        modalContent.innerHTML = content;
+        
+    } catch (error) {
+        console.error('Error fetching node connections:', error);
+        
+        // Fallback to original modal content if API fails
+        let content = buildBasicModalContent(nodeData);
+        modalContent.innerHTML = content;
+        
+        // Show error message
+        showMessage('Failed to load detailed connection data', 'error');
+    }
+}
+
+function buildEnhancedModalContent(nodeData, connectionData) {
+    let content = '';
+    
+    // Basic Information Section
+    content += `
+        <div class="modal-section">
+            <div class="modal-section-title">Basic Information</div>
+            <div class="modal-info-item">
+                <span class="modal-info-label">Name:</span>
+                <span class="modal-info-value">${nodeData.id}</span>
+            </div>
+            <div class="modal-info-item">
+                <span class="modal-info-label">Type:</span>
+                <span class="modal-info-value">${nodeData.group || 'Not specified'}</span>
+            </div>
+        </div>
+    `;
+    
+    // Enhanced Network Overview Section
+    content += `
+        <div class="modal-section">
+            <div class="modal-section-title">Network Overview</div>
+            <div class="modal-info-item">
+                <span class="modal-info-label">Total Connections:</span>
+                <span class="modal-info-value">${connectionData.totalConnections}</span>
+            </div>
+            <div class="modal-info-item">
+                <span class="modal-info-label">Parent Nodes:</span>
+                <span class="modal-info-value">${connectionData.parentCount}</span>
+            </div>
+            <div class="modal-info-item">
+                <span class="modal-info-label">Child Nodes:</span>
+                <span class="modal-info-value">${connectionData.childCount}</span>
+            </div>
+        </div>
+    `;
+    
+    // Enhanced Connections Section
+    if (connectionData.totalConnections > 0) {
+        content += `<div class="modal-section">`;
+        content += `<div class="modal-section-title">Detailed Connections</div>`;
+        
+        if (connectionData.connections.parents.length > 0) {
+            content += `
+                <div class="connection-group">
+                    <div class="connection-group-title">
+                        <span class="connection-arrow">⬆️</span>
+                        Parent Nodes (${connectionData.connections.parents.length})
+                    </div>
+                    <div class="connection-list">
+                        ${connectionData.connections.parents.map(parent => `
+                            <div class="connection-item" onclick="navigateToNode('${parent.id}')">
+                                <div style="display: flex; flex-direction: column; flex: 1;">
+                                    <span class="connection-name">${parent.name}</span>
+                                    ${parent.attributes && parent.attributes.length > 0 ? 
+                                        `<div style="font-size: 11px; color: #999; margin-top: 2px;">
+                                            ${parent.attributes.length} attribute${parent.attributes.length > 1 ? 's' : ''}
+                                        </div>` : ''
+                                    }
+                                </div>
+                                <span class="connection-type">${parent.type}</span>
+                            </div>
+                        `).join('')}
+                    </div>
+                </div>
+            `;
+        }
+        
+        if (connectionData.connections.children.length > 0) {
+            content += `
+                <div class="connection-group">
+                    <div class="connection-group-title">
+                        <span class="connection-arrow">⬇️</span>
+                        Child Nodes (${connectionData.connections.children.length})
+                    </div>
+                    <div class="connection-list">
+                        ${connectionData.connections.children.map(child => `
+                            <div class="connection-item" onclick="navigateToNode('${child.id}')">
+                                <div style="display: flex; flex-direction: column; flex: 1;">
+                                    <span class="connection-name">${child.name}</span>
+                                    ${child.attributes && child.attributes.length > 0 ? 
+                                        `<div style="font-size: 11px; color: #999; margin-top: 2px;">
+                                            ${child.attributes.length} attribute${child.attributes.length > 1 ? 's' : ''}
+                                        </div>` : ''
+                                    }
+                                </div>
+                                <span class="connection-type">${child.type}</span>
+                            </div>
+                        `).join('')}
+                    </div>
+                </div>
+            `;
+        }
+        
+        content += `</div>`;
+    } else {
+        content += `
+            <div class="modal-section">
+                <div class="modal-section-title">Connections</div>
+                <div style="color: #999; font-style: italic; text-align: center; padding: 20px;">
+                    This node has no connections
+                </div>
+            </div>
+        `;
+    }
+    
+    // Custom Attributes Section
+    if (nodeData.attributes && nodeData.attributes.length > 0) {
+        content += `
+            <div class="modal-section">
+                <div class="modal-section-title">Custom Attributes</div>
+                ${nodeData.attributes.map(attr => `
+                    <div class="modal-attribute-item">
+                        <div class="modal-attribute-name">${attr.name}</div>
+                        <div class="modal-attribute-value">${attr.value}</div>
+                    </div>
+                `).join('')}
+            </div>
+        `;
+    } else {
+        content += `
+            <div class="modal-section">
+                <div class="modal-section-title">Custom Attributes</div>
+                <div style="color: #999; font-style: italic; text-align: center; padding: 20px;">
+                    No custom attributes defined
+                </div>
+            </div>
+        `;
+    }
+    
+    // Add action buttons
+    content += `
+        <div class="modal-section">
+            <div class="modal-section-title">Actions</div>
+            <div style="display: flex; gap: 8px; flex-wrap: wrap;">
+                <button class="map-action-btn" onclick="editNodeFromModal('${nodeData.id}')">
+                    ✏️ Edit Node
+                </button>
+                <button class="map-action-btn" onclick="exportNodeConnections('${nodeData.id}')">
+                    📊 Export Connections
+                </button>
+                <button class="map-action-btn" onclick="refreshNodeModal('${nodeData.id}')">
+                    🔄 Refresh
+                </button>
+            </div>
+        </div>
+    `;
+    
+    return content;
+}
+
+function buildBasicModalContent(nodeData) {
+    // Fallback to original modal content structure
+    let content = '';
+    
+    // Basic Information Section
+    content += `
+        <div class="modal-section">
+            <div class="modal-section-title">Basic Information</div>
+            <div class="modal-info-item">
+                <span class="modal-info-label">Name:</span>
+                <span class="modal-info-value">${nodeData.id}</span>
+            </div>
+            <div class="modal-info-item">
+                <span class="modal-info-label">Type:</span>
+                <span class="modal-info-value">${nodeData.group || 'Not specified'}</span>
+            </div>
+        </div>
+    `;
+    
+    // Basic connections from current map data
+    const parentConnections = window.currentMapData.links
+        .filter(link => link.target === nodeData.id)
+        .map(link => {
+            const parentNode = window.currentMapData.nodes.find(n => n.id === link.source);
+            return {
+                id: link.source,
+                group: parentNode ? parentNode.group : 'Unknown'
+            };
+        });
+    
+    const childConnections = window.currentMapData.links
+        .filter(link => link.source === nodeData.id)
+        .map(link => {
+            const childNode = window.currentMapData.nodes.find(n => n.id === link.target);
+            return {
+                id: link.target,
+                group: childNode ? childNode.group : 'Unknown'
+            };
+        });
+    
+    // Network Overview
+    content += `
+        <div class="modal-section">
+            <div class="modal-section-title">Network Overview</div>
+            <div class="modal-info-item">
+                <span class="modal-info-label">Total Connections:</span>
+                <span class="modal-info-value">${parentConnections.length + childConnections.length}</span>
+            </div>
+            <div class="modal-info-item">
+                <span class="modal-info-label">Parent Nodes:</span>
+                <span class="modal-info-value">${parentConnections.length}</span>
+            </div>
+            <div class="modal-info-item">
+                <span class="modal-info-label">Child Nodes:</span>
+                <span class="modal-info-value">${childConnections.length}</span>
+            </div>
+        </div>
+    `;
+    
+    // Basic connections
+    if (parentConnections.length > 0 || childConnections.length > 0) {
+        content += `<div class="modal-section">`;
+        content += `<div class="modal-section-title">Connections</div>`;
+        
+        if (parentConnections.length > 0) {
+            content += `
+                <div class="connection-group">
+                    <div class="connection-group-title">
+                        <span class="connection-arrow">⬆️</span>
+                        Parent Nodes
+                    </div>
+                    <div class="connection-list">
+                        ${parentConnections.map(parent => `
+                            <div class="connection-item" onclick="navigateToNode('${parent.id}')">
+                                <span class="connection-name">${parent.id}</span>
+                                <span class="connection-type">${parent.group}</span>
+                            </div>
+                        `).join('')}
+                    </div>
+                </div>
+            `;
+        }
+        
+        if (childConnections.length > 0) {
+            content += `
+                <div class="connection-group">
+                    <div class="connection-group-title">
+                        <span class="connection-arrow">⬇️</span>
+                        Child Nodes
+                    </div>
+                    <div class="connection-list">
+                        ${childConnections.map(child => `
+                            <div class="connection-item" onclick="navigateToNode('${child.id}')">
+                                <span class="connection-name">${child.id}</span>
+                                <span class="connection-type">${child.group}</span>
+                            </div>
+                        `).join('')}
+                    </div>
+                </div>
+            `;
+        }
+        
+        content += `</div>`;
+    }
+    
+    return content;
+}
+
+// Navigation and action functions
+function navigateToNode(nodeId) {
+    const nodeData = window.currentMapData.nodes.find(n => n.id === nodeId);
+    if (nodeData) {
+        openNodeModalWithConnections(nodeData);
+    }
+}
+
+function editNodeFromModal(nodeId) {
+    closeNodeModal();
+    
+    // Switch to edit tool
+    selectTool('edit');
+    
+    // Select the node in the dropdown
+    const editNodeSelect = document.getElementById('editNodeSelect');
+    editNodeSelect.value = nodeId;
+    populateEditNodeForm();
+    
+    showMessage(`Editing node: ${nodeId}`);
+}
+
+async function exportNodeConnections(nodeId) {
+    try {
+        const response = await fetch(`/api/maps/${window.currentMapId}/nodes/${nodeId}/connections`);
+        const connectionData = await response.json();
+        
+        const dataStr = JSON.stringify(connectionData, null, 2);
+        const dataBlob = new Blob([dataStr], {type: 'application/json'});
+        const url = URL.createObjectURL(dataBlob);
+        const link = document.createElement('a');
+        link.href = url;
+        link.download = `${nodeId}-connections.json`;
+        link.click();
+        URL.revokeObjectURL(url);
+        
+        showMessage('Node connections exported successfully!');
+    } catch (error) {
+        console.error('Error exporting node connections:', error);
+        showMessage('Failed to export node connections', 'error');
+    }
+}
+
+function refreshNodeModal(nodeId) {
+    const nodeData = window.currentMapData.nodes.find(n => n.id === nodeId);
+    if (nodeData) {
+        openNodeModalWithConnections(nodeData);
+        showMessage('Node details refreshed');
+    }
+}
+
+// Update the existing openNodeModal function to use the new enhanced version
+window.openNodeModal = openNodeModalWithConnections;
+window.navigateToNode = navigateToNode;
+window.editNodeFromModal = editNodeFromModal;
+window.exportNodeConnections = exportNodeConnections;
+window.refreshNodeModal = refreshNodeModal;
 
 // Global functions for HTML access
 window.closeNodeModal = closeNodeModal;

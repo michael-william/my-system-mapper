@@ -478,6 +478,129 @@ app.delete('/api/maps/:id/connections', async (req, res) => {
     }
 });
 
+// Add this endpoint to your server.js file, after the existing node endpoints
+
+// Get connections for a specific node
+app.get('/api/maps/:id/nodes/:nodeId/connections', async (req, res) => {
+    try {
+        const mapId = req.params.id;
+        const nodeId = req.params.nodeId;
+        console.log(`📡 GET /api/maps/${mapId}/nodes/${nodeId}/connections - Fetching node connections`);
+        
+        const mapData = await redisClient.get(`map:${mapId}`);
+        if (!mapData) {
+            return res.status(404).json({ error: 'Map not found' });
+        }
+        
+        const map = JSON.parse(mapData);
+        
+        // Check if node exists
+        const node = map.nodes.find(n => n.id === nodeId);
+        if (!node) {
+            return res.status(404).json({ error: 'Node not found' });
+        }
+        
+        // Find parent connections (incoming links to this node)
+        const parentConnections = map.links
+            .filter(link => link.target === nodeId)
+            .map(link => {
+                const parentNode = map.nodes.find(n => n.id === link.source);
+                return {
+                    id: link.source,
+                    name: link.source,
+                    type: parentNode ? parentNode.group : 'Unknown',
+                    direction: 'parent',
+                    attributes: parentNode ? parentNode.attributes : []
+                };
+            });
+        
+        // Find child connections (outgoing links from this node)
+        const childConnections = map.links
+            .filter(link => link.source === nodeId)
+            .map(link => {
+                const childNode = map.nodes.find(n => n.id === link.target);
+                return {
+                    id: link.target,
+                    name: link.target,
+                    type: childNode ? childNode.group : 'Unknown',
+                    direction: 'child',
+                    attributes: childNode ? childNode.attributes : []
+                };
+            });
+        
+        // Combine all connections
+        const allConnections = [...parentConnections, ...childConnections];
+        
+        const connectionData = {
+            nodeId: nodeId,
+            nodeName: node.id,
+            nodeType: node.group,
+            totalConnections: allConnections.length,
+            parentCount: parentConnections.length,
+            childCount: childConnections.length,
+            connections: {
+                parents: parentConnections,
+                children: childConnections,
+                all: allConnections
+            }
+        };
+        
+        console.log(`📊 Found ${allConnections.length} connections for node: ${nodeId}`);
+        console.log(`📊 Parents: ${parentConnections.length}, Children: ${childConnections.length}`);
+        
+        res.json(connectionData);
+    } catch (error) {
+        console.error('❌ Error fetching node connections:', error);
+        res.status(500).json({ error: 'Failed to fetch node connections' });
+    }
+});
+
+// Optional: Add an endpoint to get detailed connection information
+app.get('/api/maps/:id/connections', async (req, res) => {
+    try {
+        const mapId = req.params.id;
+        console.log(`📡 GET /api/maps/${mapId}/connections - Fetching all connections`);
+        
+        const mapData = await redisClient.get(`map:${mapId}`);
+        if (!mapData) {
+            return res.status(404).json({ error: 'Map not found' });
+        }
+        
+        const map = JSON.parse(mapData);
+        
+        // Enhance links with node information
+        const enhancedConnections = map.links.map(link => {
+            const sourceNode = map.nodes.find(n => n.id === link.source);
+            const targetNode = map.nodes.find(n => n.id === link.target);
+            
+            return {
+                source: {
+                    id: link.source,
+                    name: link.source,
+                    type: sourceNode ? sourceNode.group : 'Unknown',
+                    attributes: sourceNode ? sourceNode.attributes : []
+                },
+                target: {
+                    id: link.target,
+                    name: link.target,
+                    type: targetNode ? targetNode.group : 'Unknown',
+                    attributes: targetNode ? targetNode.attributes : []
+                },
+                relationship: `${link.source} → ${link.target}`
+            };
+        });
+        
+        res.json({
+            mapId: mapId,
+            totalConnections: enhancedConnections.length,
+            connections: enhancedConnections
+        });
+    } catch (error) {
+        console.error('❌ Error fetching connections:', error);
+        res.status(500).json({ error: 'Failed to fetch connections' });
+    }
+});
+
 // Serve the main page
 app.get('/', (req, res) => {
     res.sendFile(path.join(__dirname, 'public', 'index.html'));
