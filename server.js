@@ -225,6 +225,11 @@ app.delete('/api/maps/:id', async (req, res) => {
     }
 });
 
+// Add this endpoint to your server.js file, RIGHT AFTER the existing node DELETE endpoint
+// Find this section and add the new endpoint after it:
+
+// Continue with your existing code below...
+
 // Add node to map
 app.post('/api/maps/:id/nodes', async (req, res) => {
     try {
