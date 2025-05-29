@@ -199,6 +199,32 @@ app.post('/api/maps', async (req, res) => {
     }
 });
 
+// Delete map
+app.delete('/api/maps/:id', async (req, res) => {
+    try {
+        const mapId = req.params.id;
+        console.log(`📡 DELETE /api/maps/${mapId} - Deleting map`);
+        
+        // Check if map exists
+        const mapData = await redisClient.get(`map:${mapId}`);
+        if (!mapData) {
+            return res.status(404).json({ error: 'Map not found' });
+        }
+        
+        // Remove from maps list
+        await redisClient.hDel('maps:list', mapId);
+        
+        // Remove full map data
+        await redisClient.del(`map:${mapId}`);
+        
+        console.log('✅ Map deleted:', mapId);
+        res.status(204).send();
+    } catch (error) {
+        console.error('❌ Error deleting map:', error);
+        res.status(500).json({ error: 'Failed to delete map' });
+    }
+});
+
 // Add node to map
 app.post('/api/maps/:id/nodes', async (req, res) => {
     try {
