@@ -98,6 +98,8 @@ async function populateEditNodeForm() {
     const editNodeForm = document.getElementById('editNodeForm');
     const selectedId = editNodeSelect.value;
     
+    console.log('🔍 populateEditNodeForm called with selectedId:', selectedId);
+    
     if (!selectedId) {
         editNodeForm.style.display = 'none';
         return;
@@ -120,14 +122,27 @@ async function populateEditNodeForm() {
 
     // Find current parent nodes
     const currentParents = window.currentMapData.links
-        .filter(link => link.target === selectedId)
-        .map(link => link.source);
+        .filter(link => (link.target.id || link.target) === selectedId)
+        .map(link => link.source.id || link.source);
+    
+    console.log('🔍 Current parents found:', currentParents);
+    console.log('🔍 All links for debugging:', window.currentMapData.links);
+    console.log('🔍 Links pointing to selectedId:', window.currentMapData.links.filter(link => link.target === selectedId));
+    console.log('🔍 Checking link targets vs selectedId:');
+    window.currentMapData.links.forEach((link, i) => {
+        const sourceId = link.source.id || link.source;
+        const targetId = link.target.id || link.target;
+        console.log(`🔍 Link ${i}: source="${sourceId}", target="${targetId}", target===selectedId: ${targetId === selectedId}`);
+    });
 
     // Create parent node selects (at least one)
     if (currentParents.length === 0) {
+        console.log('🔍 No parents found, creating empty select');
         addEditParentNodeSelect();
     } else {
+        console.log('🔍 Creating parent selects for:', currentParents);
         currentParents.forEach((parentId, index) => {
+            console.log(`🔍 Creating parent select ${index + 1} for parentId:`, parentId);
             addEditParentNodeSelect(parentId);
         });
     }
@@ -142,6 +157,7 @@ async function populateEditNodeForm() {
 }
 
 function addEditParentNodeSelect(selectedParentId = '') {
+    console.log('🔍 addEditParentNodeSelect called with selectedParentId:', selectedParentId);
     const container = document.getElementById('editParentNodeContainer');
     
     const rowDiv = document.createElement('div');
@@ -155,7 +171,10 @@ function addEditParentNodeSelect(selectedParentId = '') {
         // Don't include the currently edited node as a parent option
         const editNodeSelect = document.getElementById('editNodeSelect');
         const currentEditId = editNodeSelect.value;
+        console.log('🔍 currentEditId:', currentEditId);
+        console.log('🔍 Available nodes:', window.currentMapData.nodes.map(n => n.id));
         
+        let optionFound = false;
         window.currentMapData.nodes.forEach(node => {
             if (node.id !== currentEditId) {
                 const option = document.createElement('option');
@@ -163,10 +182,15 @@ function addEditParentNodeSelect(selectedParentId = '') {
                 option.textContent = node.id;
                 if (node.id === selectedParentId) {
                     option.selected = true;
+                    optionFound = true;
+                    console.log('🔍 ✅ Pre-selected option:', node.id);
                 }
                 select.appendChild(option);
             }
         });
+        
+        console.log('🔍 selectedParentId found in options:', optionFound);
+        console.log('🔍 Final select value after setup:', select.value);
     }
 
     const removeBtn = document.createElement('button');

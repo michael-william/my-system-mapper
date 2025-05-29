@@ -7,6 +7,13 @@ window.currentMapId = null;
 // Initialize app when DOM is ready
 document.addEventListener('DOMContentLoaded', async () => {
     console.log('🚀 System Mapper initializing...');
+
+        // Set dark mode by default
+    document.body.classList.add('dark');
+    const themeBtn = document.querySelector('.theme-toggle');
+    if (themeBtn) {
+        themeBtn.innerHTML = '☀️'; // Sun icon for dark mode
+    }
     
     try {
         // Load maps from API
@@ -21,6 +28,7 @@ document.addEventListener('DOMContentLoaded', async () => {
         showMessage('Failed to initialize application', 'error');
     }
 });
+
 
 // Initialize parent node container structure
 function initializeParentNodeContainer() {

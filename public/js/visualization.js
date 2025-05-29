@@ -2,6 +2,9 @@
 
 let simulation = null;
 
+// Enhanced D3.js Visualization with improved aesthetics
+// Replace your initVisualization function with this enhanced version
+
 function initVisualization() {
     clearVisualization();
 
@@ -9,103 +12,395 @@ function initVisualization() {
 
     const width = window.innerWidth;
     const height = window.innerHeight;
-    const colorScale = d3.scaleOrdinal(d3.schemeCategory10);
+    
+    // Enhanced color scheme - more modern and vibrant
+    const colorScale = d3.scaleOrdinal([
+        '#667eea', '#764ba2', '#f093fb', '#f5576c', 
+        '#4facfe', '#00f2fe', '#43e97b', '#38f9d7',
+        '#ffecd2', '#fcb69f', '#a8edea', '#fed6e3',
+        '#ff9a9e', '#fecfef', '#ffeaa7', '#fab1a0'
+    ]);
+    
     const nodeTooltip = d3.select("#nodeTooltip");
 
     const svg = d3.select("svg")
-        .attr("viewBox", [0, 0, width, height]);
+        .attr("viewBox", [0, 0, width, height])
+        .style("background", "radial-gradient(ellipse at center, #1a1a2e 0%, #16213e 50%, #0f0f23 100%)");
 
-    const LXC = svg.append("g");
+    // Add filter definitions for glow effects
+    const defs = svg.append("defs");
+    
+    // Glow filter for nodes
+    const nodeGlow = defs.append("filter")
+        .attr("id", "nodeGlow")
+        .attr("x", "-50%")
+        .attr("y", "-50%")
+        .attr("width", "200%")
+        .attr("height", "200%");
+    
+    nodeGlow.append("feGaussianBlur")
+        .attr("stdDeviation", "3")
+        .attr("result", "coloredBlur");
+    
+    const nodeMerge = nodeGlow.append("feMerge");
+    nodeMerge.append("feMergeNode").attr("in", "coloredBlur");
+    nodeMerge.append("feMergeNode").attr("in", "SourceGraphic");
 
-    svg.call(d3.zoom().on("zoom", ({transform}) => {
-        LXC.attr("transform", transform);
-    }));
+    // Glow filter for links
+    const linkGlow = defs.append("filter")
+        .attr("id", "linkGlow")
+        .attr("x", "-50%")
+        .attr("y", "-50%")
+        .attr("width", "200%")
+        .attr("height", "200%");
+    
+    linkGlow.append("feGaussianBlur")
+        .attr("stdDeviation", "2")
+        .attr("result", "coloredBlur");
+    
+    const linkMerge = linkGlow.append("feMerge");
+    linkMerge.append("feMergeNode").attr("in", "coloredBlur");
+    linkMerge.append("feMergeNode").attr("in", "SourceGraphic");
 
+    // Add gradient definitions for links
+    const linkGradient = defs.append("linearGradient")
+        .attr("id", "linkGradient")
+        .attr("gradientUnits", "userSpaceOnUse");
+    
+    linkGradient.append("stop")
+        .attr("offset", "0%")
+        .attr("stop-color", "#667eea")
+        .attr("stop-opacity", 0.8);
+    
+    linkGradient.append("stop")
+        .attr("offset", "100%")
+        .attr("stop-color", "#764ba2")
+        .attr("stop-opacity", 0.4);
+
+    const container = svg.append("g");
+
+    // Enhanced zoom with smooth transitions
+    const zoom = d3.zoom()
+        .scaleExtent([0.1, 4])
+        .on("zoom", ({transform}) => {
+            container.attr("transform", transform);
+        });
+    
+    svg.call(zoom);
+
+    // Enhanced simulation with better forces
     simulation = d3.forceSimulation(window.currentMapData.nodes)
-        .force("link", d3.forceLink(window.currentMapData.links).id(d => d.id).distance(120))
-        .force("charge", d3.forceManyBody().strength(-400))
-        .force("center", d3.forceCenter(width / 2, height / 2));
+        .force("link", d3.forceLink(window.currentMapData.links)
+            .id(d => d.id)
+            .distance(d => {
+                // Dynamic link distance based on node types
+                const sourceNode = window.currentMapData.nodes.find(n => n.id === d.source.id || n.id === d.source);
+                const targetNode = window.currentMapData.nodes.find(n => n.id === d.target.id || n.id === d.target);
+                
+                if (sourceNode?.group === 'Hardware' && targetNode?.group === 'Hardware') {
+                    return 150; // Hardware components closer together
+                }
+                return 120;
+            })
+            .strength(0.8))
+        .force("charge", d3.forceManyBody()
+            .strength(d => {
+                // Stronger repulsion for nodes with more connections
+                const connections = window.currentMapData.links.filter(l => 
+                    l.source === d.id || l.target === d.id || 
+                    l.source.id === d.id || l.target.id === d.id
+                ).length;
+                return -300 - (connections * 50);
+            }))
+        .force("center", d3.forceCenter(width / 2, height / 2))
+        .force("collision", d3.forceCollide().radius(d => {
+            // Dynamic collision radius based on node importance
+            const connections = window.currentMapData.links.filter(l => 
+                l.source === d.id || l.target === d.id ||
+                l.source.id === d.id || l.target.id === d.id
+            ).length;
+            return 25 + (connections * 3);
+        }));
 
-    const link = LXC.append("g")
-        .attr("stroke", "#aaa")
-        .attr("stroke-opacity", 0.6)
+    // Enhanced links with gradients and animations
+    const link = container.append("g")
+        .attr("class", "links")
         .selectAll("line")
         .data(window.currentMapData.links)
         .join("line")
-        .attr("stroke-width", 1.5);
+        .attr("stroke", "url(#linkGradient)")
+        .attr("stroke-width", d => {
+            // Dynamic width based on connection importance
+            const sourceNode = window.currentMapData.nodes.find(n => n.id === (d.source.id || d.source));
+            const targetNode = window.currentMapData.nodes.find(n => n.id === (d.target.id || d.target));
+            
+            if (sourceNode?.group === 'Hardware' || targetNode?.group === 'Hardware') {
+                return 3;
+            }
+            return 2;
+        })
+        .attr("stroke-opacity", 0.6)
+        .attr("filter", "url(#linkGlow)")
+        .style("cursor", "pointer")
+        .on("mouseover", function(event, d) {
+            d3.select(this)
+                .transition()
+                .duration(200)
+                .attr("stroke-opacity", 1)
+                .attr("stroke-width", 4);
+        })
+        .on("mouseout", function(event, d) {
+            d3.select(this)
+                .transition()
+                .duration(200)
+                .attr("stroke-opacity", 0.6)
+                .attr("stroke-width", d => {
+                    const sourceNode = window.currentMapData.nodes.find(n => n.id === (d.source.id || d.source));
+                    const targetNode = window.currentMapData.nodes.find(n => n.id === (d.target.id || d.target));
+                    return (sourceNode?.group === 'Hardware' || targetNode?.group === 'Hardware') ? 3 : 2;
+                });
+        });
 
-    const node = LXC.append("g")
-        .attr("stroke", "#fff")
-        .attr("stroke-width", 1.5)
+    // Enhanced nodes with dynamic sizing and better styling
+    const node = container.append("g")
+        .attr("class", "nodes")
         .selectAll("circle")
         .data(window.currentMapData.nodes)
         .join("circle")
-        .attr("r", 10)
-        .attr("fill", d => colorScale(d.group))
+        .attr("r", d => {
+            // Dynamic radius based on connections and importance
+            const connections = window.currentMapData.links.filter(l => 
+                l.source === d.id || l.target === d.id ||
+                l.source.id === d.id || l.target.id === d.id
+            ).length;
+            
+            // Base size + connection bonus + type bonus
+            let radius = 12;
+            radius += connections * 2;
+            
+            // Special nodes get bigger
+            if (d.id === 'Internet' || d.id.includes('Proxmox')) radius += 6;
+            if (d.group === 'Hardware') radius += 3;
+            
+            return Math.min(radius, 25); // Cap at 25px
+        })
+        .attr("fill", d => {
+            // Enhanced color mapping
+            const baseColor = colorScale(d.group);
+            return `url(#nodeGradient-${d.group})` || baseColor;
+        })
+        .attr("stroke", "#ffffff")
+        .attr("stroke-width", 2)
+        .attr("filter", "url(#nodeGlow)")
         .style("cursor", "pointer")
         .call(drag(simulation))
-        .on("mouseover", (event, d) => {
-            // Simple tooltip showing only the node name
-            nodeTooltip
-                .style("opacity", 1)
-                .text(d.id)
-                .style("left", (event.pageX + 10) + "px")
-                .style("top", (event.pageY - 10) + "px");
+        .on("mouseover", function(event, d) {
+            // Enhanced hover effect
+            d3.select(this)
+                .transition()
+                .duration(200)
+                .attr("r", function() {
+                    const currentRadius = d3.select(this).attr("r");
+                    return parseFloat(currentRadius) * 1.2;
+                })
+                .attr("stroke-width", 4);
+            
+            // Show enhanced tooltip near mouse cursor
+            const tooltip = document.getElementById('nodeTooltip');
+            tooltip.style.opacity = '1';
+            tooltip.innerHTML = `
+                <div style="font-weight: bold; margin-bottom: 4px;">${d.id}</div>
+                <div style="font-size: 11px; opacity: 0.8;">Type: ${d.group || 'Unknown'}</div>
+                <div style="font-size: 11px; opacity: 0.8;">Connections: ${
+                    window.currentMapData.links.filter(l => 
+                        l.source === d.id || l.target === d.id ||
+                        l.source.id === d.id || l.target.id === d.id
+                    ).length
+                }</div>
+            `;
+            
+            // Calculate position relative to the mouse with proper offset
+            const rect = svg.node().getBoundingClientRect();
+            const x = event.clientX - rect.left + 10;
+            const y = event.clientY - rect.top - 10;
+            
+            tooltip.style.left = x + 'px';
+            tooltip.style.top = y + 'px';
         })
         .on("mousemove", (event, d) => {
-            // Update tooltip position as mouse moves
-            nodeTooltip
-                .style("left", (event.pageX + 10) + "px")
-                .style("top", (event.pageY - 10) + "px");
+            // Update tooltip position to follow mouse
+            const tooltip = document.getElementById('nodeTooltip');
+            const rect = svg.node().getBoundingClientRect();
+            const x = event.clientX - rect.left + 10;
+            const y = event.clientY - rect.top - 10;
+            
+            tooltip.style.left = x + 'px';
+            tooltip.style.top = y + 'px';
         })
-        .on("mouseout", () => {
-            // Hide tooltip
+        
+        .on("mouseout", function() {
+            d3.select(this)
+                .transition()
+                .duration(200)
+                .attr("r", function(d) {
+                    const connections = window.currentMapData.links.filter(l => 
+                        l.source === d.id || l.target === d.id ||
+                        l.source.id === d.id || l.target.id === d.id
+                    ).length;
+                    let radius = 12 + connections * 2;
+                    if (d.id === 'Internet' || d.id.includes('Proxmox')) radius += 6;
+                    if (d.group === 'Hardware') radius += 3;
+                    return Math.min(radius, 25);
+                })
+                .attr("stroke-width", 2);
+            
             nodeTooltip.style("opacity", 0);
         })
         .on("click", (event, d) => {
-            // Prevent drag behavior on click
             if (event.defaultPrevented) return;
-            
-            // Hide tooltip when modal opens
             nodeTooltip.style("opacity", 0);
-            
-            // Check if Ctrl/Cmd key is held for debug mode
-            if (event.ctrlKey || event.metaKey) {
-                console.log('🔍 Debug mode - Node data:', d);
-                console.log('🔍 All connections for this node:', 
-                    window.currentMapData.links.filter(l => 
-                        l.source === d.id || l.target === d.id
-                    )
-                );
-            }
-            
-            // Open enhanced modal with API data
             openNodeModalWithConnections(d);
-        })
+        });
 
-    const label = LXC.append("g")
+    // Create gradients for each node type
+    const nodeTypes = [...new Set(window.currentMapData.nodes.map(n => n.group))];
+    nodeTypes.forEach(type => {
+        const gradient = defs.append("radialGradient")
+            .attr("id", `nodeGradient-${type}`)
+            .attr("cx", "30%")
+            .attr("cy", "30%");
+        
+        const baseColor = colorScale(type);
+        gradient.append("stop")
+            .attr("offset", "0%")
+            .attr("stop-color", d3.color(baseColor).brighter(0.8));
+        
+        gradient.append("stop")
+            .attr("offset", "100%")
+            .attr("stop-color", baseColor);
+    });
+
+    // Enhanced labels with better positioning
+    const label = container.append("g")
+        .attr("class", "labels")
         .selectAll("text")
         .data(window.currentMapData.nodes)
         .join("text")
-        .text(d => d.id)
-        .attr("x", 12)
-        .attr("y", "0.31em")
-        .attr("fill", "#ccc")
-        .style("font-size", "0.75rem")
-        .style("pointer-events", "none"); // Prevent text from interfering with click events
+        .text(d => {
+            // Truncate long names for better display
+            if (d.id.length > 20) {
+                return d.id.substring(0, 17) + "...";
+            }
+            return d.id;
+        })
+        .attr("x", 0)
+        .attr("y", 0)
+        .attr("text-anchor", "middle")
+        .attr("dominant-baseline", "central")
+        .attr("fill", "#ffffff")
+        .attr("font-size", d => {
+            // Dynamic font size based on node importance
+            const connections = window.currentMapData.links.filter(l => 
+                l.source === d.id || l.target === d.id ||
+                l.source.id === d.id || l.target.id === d.id
+            ).length;
+            return Math.max(10, Math.min(14, 10 + connections));
+        })
+        .attr("font-weight", "500")
+        .attr("paint-order", "stroke fill")
+        .attr("stroke", "#000000")
+        .attr("stroke-width", "2px")
+        .attr("stroke-linejoin", "round")
+        .style("pointer-events", "none")
+        .style("user-select", "none");
 
+    // Enhanced simulation tick with smooth animations
     simulation.on("tick", () => {
-        link.attr("x1", d => d.source.x)
+        link
+            .attr("x1", d => d.source.x)
             .attr("y1", d => d.source.y)
             .attr("x2", d => d.target.x)
             .attr("y2", d => d.target.y);
 
-        node.attr("cx", d => d.x)
+        node
+            .attr("cx", d => d.x)
             .attr("cy", d => d.y);
 
-        label.attr("x", d => d.x + 12)
-            .attr("y", d => d.y);
+        label
+            .attr("x", d => d.x)
+            .attr("y", d => d.y + 35); // Position below the node
     });
+
+    // Add floating particles for ambient effect (optional)
+    const particles = container.append("g")
+        .attr("class", "particles")
+        .selectAll("circle")
+        .data(d3.range(20))
+        .join("circle")
+        .attr("r", Math.random() * 2 + 1)
+        .attr("fill", "#667eea")
+        .attr("opacity", 0.3)
+        .attr("cx", () => Math.random() * width)
+        .attr("cy", () => Math.random() * height);
+
+    // Animate particles
+    function animateParticles() {
+        particles
+            .transition()
+            .duration(20000)
+            .ease(d3.easeLinear)
+            .attr("cx", () => Math.random() * width)
+            .attr("cy", () => Math.random() * height)
+            .on("end", animateParticles);
+    }
+    animateParticles();
+}
+
+// Enhanced drag behavior
+function drag(simulation) {
+    let dragStarted = false;
+    
+    function dragstarted(event, d) {
+        dragStarted = false;
+        if (!event.active) simulation.alphaTarget(0.3).restart();
+        d.fx = d.x;
+        d.fy = d.y;
+        
+        // Visual feedback
+        d3.select(this)
+            .transition()
+            .duration(100)
+            .attr("stroke-width", 6)
+            .attr("filter", "url(#nodeGlow)");
+    }
+    
+    function dragged(event, d) {
+        dragStarted = true;
+        d.fx = event.x;
+        d.fy = event.y;
+        d3.select("#nodeTooltip").style("opacity", 0);
+    }
+    
+    function dragended(event, d) {
+        if (!event.active) simulation.alphaTarget(0);
+        d.fx = null;
+        d.fy = null;
+        
+        // Reset visual feedback
+        d3.select(this)
+            .transition()
+            .duration(200)
+            .attr("stroke-width", 2);
+        
+        if (dragStarted) {
+            event.sourceEvent.preventDefault();
+        }
+    }
+    
+    return d3.drag()
+        .on("start", dragstarted)
+        .on("drag", dragged)
+        .on("end", dragended);
 }
 
 function clearVisualization() {
@@ -356,13 +651,23 @@ async function openNodeModalWithConnections(nodeData) {
     
     try {
         // Fetch detailed connection data from API
-        const response = await fetch(`/api/maps/${window.currentMapId}/nodes/${nodeData.id}/connections`);
+        console.log(`🔍 Fetching connections for node: ${nodeData.id} from map: ${window.currentMapId}`);
+        const url = `/api/maps/${window.currentMapId}/nodes/${encodeURIComponent(nodeData.id)}/connections`;
+        console.log(`🔍 API URL: ${url}`);
+        
+        const response = await fetch(url);
+        
+        console.log(`🔍 Response status: ${response.status}`);
+        console.log(`🔍 Response ok: ${response.ok}`);
         
         if (!response.ok) {
-            throw new Error('Failed to fetch node connections');
+            const errorText = await response.text();
+            console.error('❌ API Error Response:', errorText);
+            throw new Error(`Failed to fetch node connections: ${response.status} ${response.statusText}`);
         }
         
         const connectionData = await response.json();
+        console.log('✅ Connection data received:', connectionData);
         
         // Build enhanced modal content
         let content = buildEnhancedModalContent(nodeData, connectionData);
@@ -656,7 +961,11 @@ function editNodeFromModal(nodeId) {
     // Select the node in the dropdown
     const editNodeSelect = document.getElementById('editNodeSelect');
     editNodeSelect.value = nodeId;
-    populateEditNodeForm();
+    
+    // Use setTimeout to ensure DOM is updated before populating form
+    setTimeout(() => {
+        populateEditNodeForm();
+    }, 0);
     
     showMessage(`Editing node: ${nodeId}`);
 }
