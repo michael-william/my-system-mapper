@@ -11,7 +11,7 @@ function showMessage(message, type = 'success') {
 }
 
 // Tool Functions
-function selectTool(tool) {
+function selectTool(tool, event = null) {
     // Remove active state from all items
     document.querySelectorAll('.tool-item').forEach(i => {
         i.style.background = '';
@@ -39,9 +39,27 @@ function selectTool(tool) {
         nodeConfig.classList.remove('active');
         updateEditNodeOptions();
     }
-    // Highlight the clicked tool
-    event.target.closest('.tool-item').style.background = document.body.classList.contains('dark') ? '#333' : '#e3f2fd';
-    event.target.closest('.tool-item').style.borderColor = document.body.classList.contains('dark') ? '#667eea' : '#667eea';
+    
+    // Highlight the clicked tool if event is available
+    if (event && event.target) {
+        const toolItem = event.target.closest('.tool-item');
+        if (toolItem) {
+            toolItem.style.background = document.body.classList.contains('dark') ? '#333' : '#e3f2fd';
+            toolItem.style.borderColor = '#667eea';
+        }
+    } else {
+        // If no event, find and highlight the correct tool item by tool name
+        const toolItems = document.querySelectorAll('.tool-item');
+        toolItems.forEach(item => {
+            const toolText = item.querySelector('.tool-text');
+            if (toolText && 
+                ((tool === 'edit' && toolText.textContent.includes('Edit')) ||
+                 (tool === 'node' && toolText.textContent.includes('Add')))) {
+                item.style.background = document.body.classList.contains('dark') ? '#333' : '#e3f2fd';
+                item.style.borderColor = '#667eea';
+            }
+        });
+    }
 }
 
 function updateParentNodeOptions() {

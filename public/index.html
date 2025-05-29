@@ -81,6 +81,9 @@
         body.dark .map-action-btn:hover {
             background: #333;
         }
+        .side-panel.collapsed .map-selector {
+            display: none;
+        }
 
         /* Node Details Modal */
         .modal-overlay {
@@ -414,11 +417,11 @@
             
             <div class="panel-content">
                 <div class="tool-section">
-                    <div class="tool-item" onclick="selectTool('node')">
+                    <div class="tool-item" onclick="selectTool('node', event)">
                         <div class="tool-icon"></div>
                         <div class="tool-text">Add Node</div>
                     </div>
-                    <div class="tool-item" onclick="selectTool('edit')">
+                    <div class="tool-item" onclick="selectTool('edit', event)">
                         <div class="tool-icon"></div>
                         <div class="tool-text">Edit Node</div>
                     </div>
@@ -435,18 +438,17 @@
                         <label class="config-label">Type</label>
                         <input type="text" class="config-input" id="nodeType" list="nodeTypeOptions" placeholder="Select or enter type">
                         <datalist id="nodeTypeOptions">
-                            <option value="Hardware">
-                            <option value="Software">
-                            <option value="Service">
-                            <option value="Network">
-                            <option value="Storage">
-                            <option value="Database">
-                            <option value="External">
                             <option value="API">
                             <option value="Cache">
-                            <option value="Queue">
+                            <option value="Database">
+                            <option value="External">
+                            <option value="Hardware">
                             <option value="Monitor">
+                            <option value="OS">
                             <option value="Security">
+                            <option value="Service">
+                            <option value="Software">
+                            <option value="Storage">
                         </datalist>
                     </div>
                     
@@ -503,18 +505,17 @@
                             <label class="config-label">Type</label>
                             <input type="text" class="config-input" id="editNodeType" list="editNodeTypeOptions" placeholder="Select or enter type">
                             <datalist id="editNodeTypeOptions">
-                                <option value="Hardware">
-                                <option value="Software">
-                                <option value="Service">
-                                <option value="Network">
-                                <option value="Storage">
-                                <option value="Database">
-                                <option value="External">
                                 <option value="API">
                                 <option value="Cache">
-                                <option value="Queue">
+                                <option value="Database">
+                                <option value="External">
+                                <option value="Hardware">
                                 <option value="Monitor">
+                                <option value="OS">
                                 <option value="Security">
+                                <option value="Service">
+                                <option value="Software">
+                                <option value="Storage">
                             </datalist>
                         </div>
                         
