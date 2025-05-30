@@ -115,6 +115,7 @@ async function populateEditNodeForm() {
     // Populate basic fields
     document.getElementById('editNodeName').value = node.id;
     document.getElementById('editNodeType').value = node.group || '';
+    document.getElementById('editNodeDescription').value = node.description || '';
 
     // Clear and populate parent nodes
     const editParentContainer = document.getElementById('editParentNodeContainer');

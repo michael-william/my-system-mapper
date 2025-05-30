@@ -132,6 +132,7 @@ async function saveNode() {
     const nodeData = {
         id: document.getElementById('nodeName').value,
         group: document.getElementById('nodeType').value,
+        description: document.getElementById('nodeDescription').value || '', // ADD THIS LINE
         parentNodes: parentNodeValues,
         attributes: []
     };
@@ -165,6 +166,7 @@ async function saveNode() {
         // Clear form fields
         document.getElementById('nodeName').value = '';
         document.getElementById('nodeType').value = '';
+        document.getElementById('nodeDescription').value = '';
         document.querySelectorAll('.parent-node-select').forEach(select => select.value = '');
         document.getElementById('attributesList').innerHTML = '';
 
