@@ -704,23 +704,23 @@ function buildEnhancedModalContent(nodeData, connectionData) {
     `;
     
     // Enhanced Network Overview Section
-    content += `
-        <div class="modal-section">
-            <div class="modal-section-title">Network Overview</div>
-            <div class="modal-info-item">
-                <span class="modal-info-label">Total Connections:</span>
-                <span class="modal-info-value">${connectionData.totalConnections}</span>
-            </div>
-            <div class="modal-info-item">
-                <span class="modal-info-label">Parent Nodes:</span>
-                <span class="modal-info-value">${connectionData.parentCount}</span>
-            </div>
-            <div class="modal-info-item">
-                <span class="modal-info-label">Child Nodes:</span>
-                <span class="modal-info-value">${connectionData.childCount}</span>
-            </div>
-        </div>
-    `;
+    // content += `
+    //     <div class="modal-section">
+    //         <div class="modal-section-title">Network Overview</div>
+    //         <div class="modal-info-item">
+    //             <span class="modal-info-label">Total Connections:</span>
+    //             <span class="modal-info-value">${connectionData.totalConnections}</span>
+    //         </div>
+    //         <div class="modal-info-item">
+    //             <span class="modal-info-label">Parent Nodes:</span>
+    //             <span class="modal-info-value">${connectionData.parentCount}</span>
+    //         </div>
+    //         <div class="modal-info-item">
+    //             <span class="modal-info-label">Child Nodes:</span>
+    //             <span class="modal-info-value">${connectionData.childCount}</span>
+    //         </div>
+    //     </div>
+    // `;
     
     // Enhanced Connections Section
     if (connectionData.totalConnections > 0) {
