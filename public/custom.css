@@ -1698,6 +1698,25 @@ body.dark .canvas-area {
     transform: scale(1) translateY(0);
 }
 
+.config-textarea {
+    width: 100%;
+    padding: 8px 12px;
+    border: 1px solid rgba(102, 126, 234, 0.3);
+    border-radius: 6px;
+    background: rgba(255, 255, 255, 0.05);
+    color: #e5e5e5;
+    font-size: 14px;
+    font-family: inherit;
+    resize: vertical;
+    min-height: 60px;
+}
+
+.config-textarea:focus {
+    outline: none;
+    border-color: rgba(102, 126, 234, 0.8);
+    box-shadow: 0 0 0 3px rgba(102, 126, 234, 0.2);
+}
+
 /* Responsive */
 @media (max-width: 768px) {
     .side-panel {
