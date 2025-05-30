@@ -188,6 +188,7 @@ async function saveEditedNode() {
         // Get updated values
         const newNodeName = document.getElementById('editNodeName').value;
         const newNodeType = document.getElementById('editNodeType').value;
+        const newNodeDescription = document.getElementById('editNodeDescription').value; 
 
         // Collect parent nodes
         const newParentNodes = Array.from(document.querySelectorAll('.edit-parent-node-select'))
@@ -238,6 +239,7 @@ async function saveEditedNode() {
                 body: JSON.stringify({
                     id: newNodeName,
                     group: newNodeType || 'Default',
+                    description: newNodeDescription || '',
                     attributes: attributes,
                     parentNodes: newParentNodes
                 })
@@ -248,6 +250,7 @@ async function saveEditedNode() {
             const updateData = {
                 id: newNodeName,
                 group: newNodeType || 'Default',
+                description: newNodeDescription,
                 attributes: attributes,
                 parentNodes: newParentNodes
             };
