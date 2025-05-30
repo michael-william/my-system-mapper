@@ -700,6 +700,12 @@ function buildEnhancedModalContent(nodeData, connectionData) {
                 <span class="modal-info-label">Type:</span>
                 <span class="modal-info-value">${nodeData.group || 'Not specified'}</span>
             </div>
+            ${nodeData.description ? `
+            <div class="modal-info-item">
+                <span class="modal-info-label">Description:</span>
+                <span class="modal-info-value">${nodeData.description}</span>
+            </div>
+            ` : ''}
         </div>
     `;
     
@@ -852,6 +858,12 @@ function buildBasicModalContent(nodeData) {
                 <span class="modal-info-label">Type:</span>
                 <span class="modal-info-value">${nodeData.group || 'Not specified'}</span>
             </div>
+            ${nodeData.description ? `
+            <div class="modal-info-item">
+                <span class="modal-info-label">Description:</span>
+                <span class="modal-info-value">${nodeData.description}</span>
+            </div>
+            ` : ''}
         </div>
     `;
     
