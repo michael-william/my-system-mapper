@@ -825,17 +825,9 @@ function buildEnhancedModalContent(nodeData, connectionData) {
     content += `
         <div class="modal-section">
             <div class="modal-section-title">Actions</div>
-            <div style="display: flex; gap: 8px; flex-wrap: wrap;">
-                <button class="map-action-btn" onclick="editNodeFromModal('${nodeData.id}')">
-                    ✏️ Edit Node
-                </button>
-                <button class="map-action-btn" onclick="exportNodeConnections('${nodeData.id}')">
-                    📊 Export Connections
-                </button>
-                <button class="map-action-btn" onclick="refreshNodeModal('${nodeData.id}')">
-                    🔄 Refresh
-                </button>
-            </div>
+            <button class="save-node-btn" onclick="editNodeFromModal('${nodeData.id}')" style="margin-top: 0;">
+                Edit Node
+            </button>
         </div>
     `;
     
