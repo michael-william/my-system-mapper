@@ -701,9 +701,9 @@ function buildEnhancedModalContent(nodeData, connectionData) {
                 <span class="modal-info-value">${nodeData.group || 'Not specified'}</span>
             </div>
             ${nodeData.description ? `
-            <div class="modal-info-item">
-                <span class="modal-info-label">Description:</span>
-                <span class="modal-info-value">${nodeData.description}</span>
+            <div class="modal-info-item" style="flex-direction: column; align-items: flex-start;">
+                <span class="modal-info-label" style="margin-bottom: 6px;">Description</span>
+                <div class="modal-info-value" style="text-align: left; width: 100%;">${nodeData.description}</div>
             </div>
             ` : ''}
         </div>
@@ -859,9 +859,9 @@ function buildBasicModalContent(nodeData) {
                 <span class="modal-info-value">${nodeData.group || 'Not specified'}</span>
             </div>
             ${nodeData.description ? `
-            <div class="modal-info-item">
-                <span class="modal-info-label">Description:</span>
-                <span class="modal-info-value">${nodeData.description}</span>
+            <div class="modal-info-item" style="flex-direction: column; align-items: flex-start;">
+                <span class="modal-info-label" style="margin-bottom: 6px;">Description</span>
+                <div class="modal-info-value" style="text-align: left; width: 100%;">${nodeData.description}</div>
             </div>
             ` : ''}
         </div>
