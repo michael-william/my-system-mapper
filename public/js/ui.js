@@ -347,7 +347,37 @@ function exportMap() {
         return;
     }
 
-    const dataStr = JSON.stringify(window.currentMapData, null, 2);
+    // Create clean export data that matches upload format exactly
+    const exportData = {
+        name: window.currentMapData.name,
+        description: window.currentMapData.description || '',
+        nodes: [],
+        links: []
+    };
+
+    // Clean nodes - remove D3.js simulation properties (x, y, vx, vy, fx, fy, etc.)
+    exportData.nodes = window.currentMapData.nodes.map(node => {
+        const cleanNode = {
+            id: node.id,
+            group: node.group,
+            attributes: node.attributes || []
+        };
+        
+        // Include description if it exists
+        if (node.description) {
+            cleanNode.description = node.description;
+        }
+        
+        return cleanNode;
+    });
+
+    // Clean links - ensure simple source/target string format (D3 may convert to objects)
+    exportData.links = window.currentMapData.links.map(link => ({
+        source: link.source.id || link.source,  // Handle both string and object references
+        target: link.target.id || link.target   // Handle both string and object references
+    }));
+
+    const dataStr = JSON.stringify(exportData, null, 2);
     const dataBlob = new Blob([dataStr], {type: 'application/json'});
     const url = URL.createObjectURL(dataBlob);
     const link = document.createElement('a');
