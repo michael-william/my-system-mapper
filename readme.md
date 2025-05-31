@@ -47,12 +47,15 @@
 
 ## 🚀 Quick Start
 
-### Option 1: Docker (Recommended)
+### Option 1: One-Command Setup (Recommended)
 
 ```bash
 # Clone the repository
 git clone https://github.com/michael-william/system-mapper.git
 cd system-mapper
+
+# Run setup script (creates .env file automatically)
+npm run setup
 
 # Start with Docker Compose
 docker-compose up -d
@@ -61,7 +64,36 @@ docker-compose up -d
 open http://localhost:3000
 ```
 
-### Option 2: Local Development
+### Option 2: Manual Setup
+
+```bash
+# Clone the repository
+git clone https://github.com/michael-william/system-mapper.git
+cd system-mapper
+
+# Create configuration file
+cp .env.example .env
+
+# Start with Docker Compose
+docker-compose up -d
+
+# Open your browser
+open http://localhost:3000
+```
+
+### Option 3: Quick Test (No Configuration Needed)
+
+```bash
+# Clone and start immediately with defaults
+git clone https://github.com/michael-william/system-mapper.git
+cd system-mapper
+docker-compose up -d
+
+# Docker will use built-in defaults if no .env file exists
+open http://localhost:3000
+```
+
+### Option 4: Local Development
 
 **Prerequisites:**
 - [Node.js](https://nodejs.org/) v16 or later
@@ -72,6 +104,10 @@ open http://localhost:3000
 git clone https://github.com/michael-william/system-mapper.git
 cd system-mapper
 npm install
+
+# Create configuration for local development
+cp .env.example .env
+# Edit .env and change REDIS_HOST=localhost
 
 # Start Redis (macOS with Homebrew)
 brew services start redis

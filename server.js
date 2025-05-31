@@ -1,30 +1,92 @@
+// Load environment variables first
+require('dotenv').config();
+
 const express = require('express');
 const cors = require('cors');
 const path = require('path');
 const fs = require('fs');
 const redis = require('redis');
 
+// Configuration from environment variables
+const config = {
+    port: process.env.PORT || 3000,
+    nodeEnv: process.env.NODE_ENV || 'development',
+    redis: {
+        host: process.env.REDIS_HOST || 'localhost',
+        port: parseInt(process.env.REDIS_PORT) || 6379,
+        password: process.env.REDIS_PASSWORD || undefined,
+        db: parseInt(process.env.REDIS_DB) || 0
+    },
+    app: {
+        defaultMapName: process.env.DEFAULT_MAP_NAME || 'My System Map',
+        maxFileSize: parseInt(process.env.MAX_FILE_SIZE) || 10485760, // 10MB
+        maxMaps: parseInt(process.env.MAX_MAPS) || 0, // 0 = unlimited
+        maxNodesPerMap: parseInt(process.env.MAX_NODES_PER_MAP) || 0, // 0 = unlimited
+        corsOrigins: process.env.CORS_ORIGINS || '*',
+        enableLogging: process.env.ENABLE_LOGGING === 'true',
+        logLevel: process.env.LOG_LEVEL || 'info',
+        embedWatermark: process.env.EMBED_WATERMARK !== 'false'
+    }
+};
+
 // Create Express app
 const app = express();
-const PORT = 3000;
 
-// Create Redis client
+// Logging function
+function log(level, message, data = null) {
+    if (!config.app.enableLogging) return;
+    
+    const timestamp = new Date().toISOString();
+    const logMessage = `[${timestamp}] ${level.toUpperCase()}: ${message}`;
+    
+    if (data) {
+        console.log(logMessage, data);
+    } else {
+        console.log(logMessage);
+    }
+}
+
+// Create Redis client with configuration
 const redisClient = redis.createClient({
-    host: 'localhost',
-    port: 6379
+    socket: {
+        host: config.redis.host,
+        port: config.redis.port,
+        connectTimeout: 10000,
+        lazyConnect: true
+    },
+    password: config.redis.password,
+    database: config.redis.db
+});
+
+// Redis error handling
+redisClient.on('error', (error) => {
+    log('error', 'Redis connection error:', error.message);
+});
+
+redisClient.on('connect', () => {
+    log('info', `Connected to Redis at ${config.redis.host}:${config.redis.port}`);
+});
+
+redisClient.on('ready', () => {
+    log('info', 'Redis client ready');
+});
+
+redisClient.on('end', () => {
+    log('info', 'Redis connection closed');
 });
 
 // Connect to Redis
 async function connectRedis() {
     try {
         await redisClient.connect();
-        console.log('📊 Connected to Redis');
+        log('info', 'Redis connection established');
         
         // Initialize with default map if no maps exist
         await initializeDefaultMap();
     } catch (error) {
-        console.error('❌ Redis connection failed:', error);
-        console.log('📝 Falling back to file storage');
+        log('error', 'Redis connection failed:', error.message);
+        log('error', 'Application will continue without Redis persistence');
+        throw error;
     }
 }
 
@@ -33,18 +95,18 @@ async function initializeDefaultMap() {
     try {
         const mapsExist = await redisClient.exists('maps:list');
         if (!mapsExist) {
-            console.log('🔧 Creating default map...');
+            log('info', 'Creating default map...');
             
             const defaultMap = {
                 id: 'default',
-                name: 'My System Map',
+                name: config.app.defaultMapName,
                 description: 'Default system map',
                 nodes: [
-                    { id: "Internet", group: "www" },
-                    { id: "Arris TG2492LG-ZG (Modem+Router)", group: "Hardware" },
+                    { id: "Internet", group: "External" },
+                    { id: "Router", group: "Hardware" },
                 ],
                 links: [
-                    { source: "Internet", target: "Arris TG2492LG-ZG (Modem+Router)" }
+                    { source: "Internet", target: "Router" }
                 ],
                 created: new Date().toISOString(),
                 updated: new Date().toISOString()
@@ -60,32 +122,57 @@ async function initializeDefaultMap() {
             }));
             
             await redisClient.set('map:default', JSON.stringify(defaultMap));
-            console.log('✅ Default map created in Redis');
+            log('info', 'Default map created');
         }
     } catch (error) {
-        console.error('❌ Error initializing default map:', error);
+        log('error', 'Error initializing default map:', error.message);
     }
 }
 
+// CORS configuration
+const corsOptions = {
+    origin: config.app.corsOrigins === '*' ? true : config.app.corsOrigins.split(','),
+    methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
+    allowedHeaders: ['Content-Type', 'Authorization'],
+    credentials: true
+};
+
 // Middleware
-app.use(cors());
-app.use(express.json());
+app.use(cors(corsOptions));
+app.use(express.json({ limit: config.app.maxFileSize }));
 app.use(express.static('public'));
+
+// Request logging middleware
+if (config.app.enableLogging) {
+    app.use((req, res, next) => {
+        log('info', `${req.method} ${req.path}`, {
+            ip: req.ip,
+            userAgent: req.get('User-Agent')
+        });
+        next();
+    });
+}
+
+// Validation middleware for map limits
+function validateMapLimits(req, res, next) {
+    // This can be expanded to check actual limits
+    next();
+}
 
 // API Routes
 
 // Get all maps (metadata only)
 app.get('/api/maps', async (req, res) => {
     try {
-        console.log('📡 GET /api/maps - Fetching all maps');
+        log('debug', 'Fetching all maps');
         
         const mapsData = await redisClient.hGetAll('maps:list');
         const maps = Object.values(mapsData).map(mapStr => JSON.parse(mapStr));
         
-        console.log(`📊 Found ${maps.length} maps`);
+        log('debug', `Found ${maps.length} maps`);
         res.json(maps);
     } catch (error) {
-        console.error('❌ Error fetching maps:', error);
+        log('error', 'Error fetching maps:', error.message);
         res.status(500).json({ error: 'Failed to fetch maps' });
     }
 });
@@ -94,7 +181,7 @@ app.get('/api/maps', async (req, res) => {
 app.get('/api/maps/:id', async (req, res) => {
     try {
         const mapId = req.params.id;
-        console.log(`📡 GET /api/maps/${mapId} - Fetching specific map`);
+        log('debug', `Fetching map: ${mapId}`);
         
         const mapData = await redisClient.get(`map:${mapId}`);
         if (!mapData) {
@@ -102,19 +189,18 @@ app.get('/api/maps/:id', async (req, res) => {
         }
         
         const map = JSON.parse(mapData);
-        console.log(`📊 Map found: ${map.name} with ${map.nodes?.length || 0} nodes`);
+        log('debug', `Map found: ${map.name} with ${map.nodes?.length || 0} nodes`);
         res.json(map);
     } catch (error) {
-        console.error('❌ Error fetching map:', error);
+        log('error', 'Error fetching map:', error.message);
         res.status(500).json({ error: 'Failed to fetch map' });
     }
 });
 
 // Create new map
-app.post('/api/maps', async (req, res) => {
+app.post('/api/maps', validateMapLimits, async (req, res) => {
     try {
-        console.log('📡 POST /api/maps - Creating new map');
-        console.log('📝 Request body:', req.body);
+        log('debug', 'Creating new map');
         
         const mapId = 'map-' + Date.now();
         const newMap = {
@@ -129,6 +215,11 @@ app.post('/api/maps', async (req, res) => {
             updated: new Date().toISOString()
         };
         
+        // Validate node count if limit is set
+        if (config.app.maxNodesPerMap > 0 && newMap.nodes.length > config.app.maxNodesPerMap) {
+            return res.status(400).json({ error: `Too many nodes. Maximum allowed: ${config.app.maxNodesPerMap}` });
+        }
+        
         // Save map metadata to hash
         await redisClient.hSet('maps:list', mapId, JSON.stringify({
             id: mapId,
@@ -141,10 +232,10 @@ app.post('/api/maps', async (req, res) => {
         // Save full map data
         await redisClient.set(`map:${mapId}`, JSON.stringify(newMap));
         
-        console.log('✅ Map created:', mapId);
+        log('info', `Map created: ${mapId}`);
         res.status(201).json(newMap);
     } catch (error) {
-        console.error('❌ Error creating map:', error);
+        log('error', 'Error creating map:', error.message);
         res.status(500).json({ error: 'Failed to create map' });
     }
 });
@@ -153,7 +244,7 @@ app.post('/api/maps', async (req, res) => {
 app.delete('/api/maps/:id', async (req, res) => {
     try {
         const mapId = req.params.id;
-        console.log(`📡 DELETE /api/maps/${mapId} - Deleting map`);
+        log('debug', `Deleting map: ${mapId}`);
         
         // Check if map exists
         const mapData = await redisClient.get(`map:${mapId}`);
@@ -167,10 +258,10 @@ app.delete('/api/maps/:id', async (req, res) => {
         // Remove full map data
         await redisClient.del(`map:${mapId}`);
         
-        console.log('✅ Map deleted:', mapId);
+        log('info', `Map deleted: ${mapId}`);
         res.status(204).send();
     } catch (error) {
-        console.error('❌ Error deleting map:', error);
+        log('error', 'Error deleting map:', error.message);
         res.status(500).json({ error: 'Failed to delete map' });
     }
 });
@@ -179,8 +270,7 @@ app.delete('/api/maps/:id', async (req, res) => {
 app.put('/api/maps/:id', async (req, res) => {
     try {
         const mapId = req.params.id;
-        console.log(`📡 PUT /api/maps/${mapId} - Updating map metadata`);
-        console.log('📝 Update data:', req.body);
+        log('debug', `Updating map metadata: ${mapId}`);
         
         const mapData = await redisClient.get(`map:${mapId}`);
         if (!mapData) {
@@ -211,7 +301,7 @@ app.put('/api/maps/:id', async (req, res) => {
             updated: map.updated
         }));
         
-        console.log('✅ Map metadata updated:', mapId);
+        log('info', `Map metadata updated: ${mapId}`);
         res.json({
             id: mapId,
             name: map.name,
@@ -219,22 +309,16 @@ app.put('/api/maps/:id', async (req, res) => {
             updated: map.updated
         });
     } catch (error) {
-        console.error('❌ Error updating map:', error);
+        log('error', 'Error updating map:', error.message);
         res.status(500).json({ error: 'Failed to update map' });
     }
 });
-
-// Add this endpoint to your server.js file, RIGHT AFTER the existing node DELETE endpoint
-// Find this section and add the new endpoint after it:
-
-// Continue with your existing code below...
 
 // Add node to map
 app.post('/api/maps/:id/nodes', async (req, res) => {
     try {
         const mapId = req.params.id;
-        console.log(`📡 POST /api/maps/${mapId}/nodes - Adding node`);
-        console.log('📝 Node data:', req.body);
+        log('debug', `Adding node to map: ${mapId}`);
         
         const mapData = await redisClient.get(`map:${mapId}`);
         if (!mapData) {
@@ -246,12 +330,18 @@ app.post('/api/maps/:id/nodes', async (req, res) => {
         const newNode = {
             id: req.body.id || `node-${Date.now()}`,
             group: req.body.group || 'Default',
+            description: req.body.description || '',
             attributes: req.body.attributes || []
         };
         
         // Check if node already exists
         if (map.nodes.find(n => n.id === newNode.id)) {
             return res.status(400).json({ error: 'Node already exists' });
+        }
+        
+        // Check node count limit
+        if (config.app.maxNodesPerMap > 0 && map.nodes.length >= config.app.maxNodesPerMap) {
+            return res.status(400).json({ error: `Maximum nodes limit reached: ${config.app.maxNodesPerMap}` });
         }
         
         map.nodes.push(newNode);
@@ -280,10 +370,10 @@ app.post('/api/maps/:id/nodes', async (req, res) => {
             updated: map.updated
         }));
         
-        console.log('✅ Node added:', newNode.id);
+        log('info', `Node added: ${newNode.id}`);
         res.status(201).json(newNode);
     } catch (error) {
-        console.error('❌ Error adding node:', error);
+        log('error', 'Error adding node:', error.message);
         res.status(500).json({ error: 'Failed to add node' });
     }
 });
@@ -293,8 +383,7 @@ app.put('/api/maps/:id/nodes/:nodeId', async (req, res) => {
     try {
         const mapId = req.params.id;
         const nodeId = req.params.nodeId;
-        console.log(`📡 PUT /api/maps/${mapId}/nodes/${nodeId} - Updating node`);
-        console.log('📝 Update data:', req.body);
+        log('debug', `Updating node: ${nodeId} in map: ${mapId}`);
         
         const mapData = await redisClient.get(`map:${mapId}`);
         if (!mapData) {
@@ -321,33 +410,23 @@ app.put('/api/maps/:id/nodes/:nodeId', async (req, res) => {
 
         // Handle parent node changes if parentNodes is provided
         if (req.body.parentNodes !== undefined) {
-            console.log('🔗 Updating parent relationships for:', nodeId);
-            console.log('🔗 New parents:', req.body.parentNodes);
+            log('debug', `Updating parent relationships for: ${nodeId}`);
             
             // Remove ALL existing links where this node is the target
-            const oldLinksCount = map.links.length;
             map.links = map.links.filter(link => link.target !== nodeId);
-            console.log(`🗑️ Removed ${oldLinksCount - map.links.length} old parent links`);
             
             // Add new parent links
-            let newLinksAdded = 0;
             req.body.parentNodes.forEach(parentId => {
                 if (parentId && parentId.trim()) {
-                    // Check if parent node exists
                     const parentExists = map.nodes.find(n => n.id === parentId);
                     if (parentExists) {
                         map.links.push({
                             source: parentId,
                             target: nodeId
                         });
-                        newLinksAdded++;
-                        console.log(`➕ Added link: ${parentId} -> ${nodeId}`);
-                    } else {
-                        console.log(`⚠️ Parent node "${parentId}" not found, skipping link`);
                     }
                 }
             });
-            console.log(`✅ Added ${newLinksAdded} new parent links`);
         }
         
         map.updated = new Date().toISOString();
@@ -364,11 +443,10 @@ app.put('/api/maps/:id/nodes/:nodeId', async (req, res) => {
             updated: map.updated
         }));
         
-        console.log('✅ Node updated successfully:', nodeId);
-        console.log('📊 Final link count:', map.links.length);
+        log('info', `Node updated: ${nodeId}`);
         res.json(map.nodes[nodeIndex]);
     } catch (error) {
-        console.error('❌ Error updating node:', error);
+        log('error', 'Error updating node:', error.message);
         res.status(500).json({ error: 'Failed to update node' });
     }
 });
@@ -378,7 +456,7 @@ app.delete('/api/maps/:id/nodes/:nodeId', async (req, res) => {
     try {
         const mapId = req.params.id;
         const nodeId = req.params.nodeId;
-        console.log(`📡 DELETE /api/maps/${mapId}/nodes/${nodeId} - Deleting node`);
+        log('debug', `Deleting node: ${nodeId} from map: ${mapId}`);
         
         const mapData = await redisClient.get(`map:${mapId}`);
         if (!mapData) {
@@ -409,82 +487,20 @@ app.delete('/api/maps/:id/nodes/:nodeId', async (req, res) => {
             updated: map.updated
         }));
         
-        console.log('✅ Node deleted:', nodeId);
+        log('info', `Node deleted: ${nodeId}`);
         res.status(204).send();
     } catch (error) {
-        console.error('❌ Error deleting node:', error);
+        log('error', 'Error deleting node:', error.message);
         res.status(500).json({ error: 'Failed to delete node' });
     }
 });
-
-// Remove connection between nodes
-app.delete('/api/maps/:id/connections', async (req, res) => {
-    try {
-        const mapId = req.params.id;
-        const { source, target } = req.body;
-        
-        console.log(`📡 DELETE /api/maps/${mapId}/connections - Removing connection`);
-        console.log('📝 Connection to remove:', { source, target });
-        
-        if (!source || !target) {
-            return res.status(400).json({ error: 'Source and target are required' });
-        }
-        
-        const mapData = await redisClient.get(`map:${mapId}`);
-        if (!mapData) {
-            return res.status(404).json({ error: 'Map not found' });
-        }
-        
-        const map = JSON.parse(mapData);
-        const originalLinkCount = map.links.length;
-        
-        // Remove the specific link
-        map.links = map.links.filter(link => 
-            !(link.source === source && link.target === target)
-        );
-        
-        const removedCount = originalLinkCount - map.links.length;
-        
-        if (removedCount === 0) {
-            return res.status(404).json({ error: 'Connection not found' });
-        }
-        
-        map.updated = new Date().toISOString();
-        
-        // Update Redis
-        await redisClient.set(`map:${mapId}`, JSON.stringify(map));
-        
-        // Update metadata
-        await redisClient.hSet('maps:list', mapId, JSON.stringify({
-            id: mapId,
-            name: map.name,
-            description: map.description,
-            nodeCount: map.nodes.length,
-            updated: map.updated
-        }));
-        
-        console.log(`✅ Connection removed: ${source} -> ${target}`);
-        console.log(`📊 Links remaining: ${map.links.length}`);
-        
-        res.json({ 
-            message: 'Connection removed successfully',
-            removedConnection: { source, target },
-            remainingLinks: map.links.length
-        });
-    } catch (error) {
-        console.error('❌ Error removing connection:', error);
-        res.status(500).json({ error: 'Failed to remove connection' });
-    }
-});
-
-// Add this endpoint to your server.js file, after the existing node endpoints
 
 // Get connections for a specific node
 app.get('/api/maps/:id/nodes/:nodeId/connections', async (req, res) => {
     try {
         const mapId = req.params.id;
         const nodeId = req.params.nodeId;
-        console.log(`📡 GET /api/maps/${mapId}/nodes/${nodeId}/connections - Fetching node connections`);
+        log('debug', `Fetching connections for node: ${nodeId}`);
         
         const mapData = await redisClient.get(`map:${mapId}`);
         if (!mapData) {
@@ -527,38 +543,33 @@ app.get('/api/maps/:id/nodes/:nodeId/connections', async (req, res) => {
                 };
             });
         
-        // Combine all connections
-        const allConnections = [...parentConnections, ...childConnections];
-        
         const connectionData = {
             nodeId: nodeId,
             nodeName: node.id,
             nodeType: node.group,
-            totalConnections: allConnections.length,
+            totalConnections: parentConnections.length + childConnections.length,
             parentCount: parentConnections.length,
             childCount: childConnections.length,
             connections: {
                 parents: parentConnections,
                 children: childConnections,
-                all: allConnections
+                all: [...parentConnections, ...childConnections]
             }
         };
         
-        console.log(`📊 Found ${allConnections.length} connections for node: ${nodeId}`);
-        console.log(`📊 Parents: ${parentConnections.length}, Children: ${childConnections.length}`);
-        
+        log('debug', `Found ${connectionData.totalConnections} connections for node: ${nodeId}`);
         res.json(connectionData);
     } catch (error) {
-        console.error('❌ Error fetching node connections:', error);
+        log('error', 'Error fetching node connections:', error.message);
         res.status(500).json({ error: 'Failed to fetch node connections' });
     }
 });
 
-// Optional: Add an endpoint to get detailed connection information
+// Get all connections
 app.get('/api/maps/:id/connections', async (req, res) => {
     try {
         const mapId = req.params.id;
-        console.log(`📡 GET /api/maps/${mapId}/connections - Fetching all connections`);
+        log('debug', `Fetching all connections for map: ${mapId}`);
         
         const mapData = await redisClient.get(`map:${mapId}`);
         if (!mapData) {
@@ -595,8 +606,66 @@ app.get('/api/maps/:id/connections', async (req, res) => {
             connections: enhancedConnections
         });
     } catch (error) {
-        console.error('❌ Error fetching connections:', error);
+        log('error', 'Error fetching connections:', error.message);
         res.status(500).json({ error: 'Failed to fetch connections' });
+    }
+});
+
+// Remove connection between nodes
+app.delete('/api/maps/:id/connections', async (req, res) => {
+    try {
+        const mapId = req.params.id;
+        const { source, target } = req.body;
+        
+        log('debug', `Removing connection: ${source} -> ${target}`);
+        
+        if (!source || !target) {
+            return res.status(400).json({ error: 'Source and target are required' });
+        }
+        
+        const mapData = await redisClient.get(`map:${mapId}`);
+        if (!mapData) {
+            return res.status(404).json({ error: 'Map not found' });
+        }
+        
+        const map = JSON.parse(mapData);
+        const originalLinkCount = map.links.length;
+        
+        // Remove the specific link
+        map.links = map.links.filter(link => 
+            !(link.source === source && link.target === target)
+        );
+        
+        const removedCount = originalLinkCount - map.links.length;
+        
+        if (removedCount === 0) {
+            return res.status(404).json({ error: 'Connection not found' });
+        }
+        
+        map.updated = new Date().toISOString();
+        
+        // Update Redis
+        await redisClient.set(`map:${mapId}`, JSON.stringify(map));
+        
+        // Update metadata
+        await redisClient.hSet('maps:list', mapId, JSON.stringify({
+            id: mapId,
+            name: map.name,
+            description: map.description,
+            nodeCount: map.nodes.length,
+            updated: map.updated
+        }));
+        
+        log('info', `Connection removed: ${source} -> ${target}`);
+        
+        res.json({ 
+            message: 'Connection removed successfully',
+            removedConnection: { source, target },
+            remainingLinks: map.links.length
+        });
+    } catch (error) {
+        log('error', 'Error removing connection:', error.message);
+        res.status(500).json({ error: 'Failed to remove connection' });
     }
 });
 
@@ -605,19 +674,12 @@ app.get('/', (req, res) => {
     res.sendFile(path.join(__dirname, 'public', 'index.html'));
 });
 
-// Error handling
-app.use((err, req, res, next) => {
-    console.error('❌ Error:', err.message);
-    res.status(500).json({ error: 'Something went wrong!' });
-});
-
-// Debug embed endpoint with better error handling
+// Enhanced embed endpoint
 app.get('/embed', (req, res) => {
-    console.log('📡 GET /embed - Request received');
-    console.log('📝 Query params:', req.query);
+    log('debug', 'Serving embed page');
     
     const mapId = req.query.map || 'default';
-    console.log(`🗺️ Loading map: ${mapId}`);
+    const showWatermark = req.query.watermark !== 'false' && config.app.embedWatermark;
     
     const embedHTML = `<!DOCTYPE html>
 <html lang="en">
@@ -644,6 +706,7 @@ app.get('/embed', (req, res) => {
         .embed-watermark {
             position: absolute; bottom: 10px; right: 10px; font-size: 10px;
             color: rgba(102, 126, 234, 0.6); pointer-events: none; z-index: 1000;
+            display: ${showWatermark ? 'block' : 'none'};
         }
         .loading {
             position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%);
@@ -656,19 +719,17 @@ app.get('/embed', (req, res) => {
         }
         @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
         .error { color: #dc3545; }
-        .debug { position: absolute; top: 10px; left: 10px; font-size: 10px; background: rgba(0,0,0,0.7); padding: 5px; border-radius: 3px; }
     </style>
 </head>
 <body>
     <div class="embed-container">
-        <div class="debug">Map ID: ${mapId}</div>
         <div class="loading" id="loadingState">
             <div class="loading-spinner"></div>
             <div>Loading map...</div>
         </div>
         <svg></svg>
         <div class="node-tooltip" id="nodeTooltip"></div>
-        <div class="embed-watermark">System Map</div>
+        ${showWatermark ? '<div class="embed-watermark">System Mapper</div>' : ''}
     </div>
 
     <script src="https://d3js.org/d3.v7.min.js"></script>
@@ -676,27 +737,16 @@ app.get('/embed', (req, res) => {
         let simulation = null;
         let currentMapData = null;
         const mapId = '${mapId}';
-        
-        console.log('🚀 Embed page loading for map:', mapId);
 
         async function loadMapData() {
             try {
-                console.log('📡 Fetching map data from:', \`/api/maps/\${mapId}\`);
-                
                 const response = await fetch(\`/api/maps/\${mapId}\`);
-                console.log('📊 Response status:', response.status);
                 
                 if (!response.ok) {
-                    const errorText = await response.text();
-                    console.error('❌ API Error:', errorText);
-                    throw new Error(\`HTTP \${response.status}: \${errorText}\`);
+                    throw new Error(\`HTTP \${response.status}\`);
                 }
                 
                 currentMapData = await response.json();
-                console.log('✅ Map data loaded:', currentMapData);
-                console.log('📊 Nodes:', currentMapData.nodes?.length || 0);
-                console.log('📊 Links:', currentMapData.links?.length || 0);
-                
                 document.getElementById('loadingState').style.display = 'none';
                 
                 if (!currentMapData.nodes || currentMapData.nodes.length === 0) {
@@ -705,29 +755,22 @@ app.get('/embed', (req, res) => {
                 
                 initVisualization();
             } catch (error) {
-                console.error('❌ Error loading map:', error);
+                console.error('Error loading map:', error);
                 document.getElementById('loadingState').innerHTML = \`
                     <div class="error">
                         <div style="font-size: 24px; margin-bottom: 16px;">⚠️</div>
                         <div>Failed to load map</div>
                         <div style="font-size: 10px; margin-top: 8px;">\${error.message}</div>
-                        <div style="font-size: 10px; margin-top: 4px;">Map ID: \${mapId}</div>
                     </div>
                 \`;
             }
         }
 
         function initVisualization() {
-            console.log('🎨 Initializing visualization...');
-            
-            if (!currentMapData || !currentMapData.nodes) {
-                console.error('❌ No map data available for visualization');
-                return;
-            }
+            if (!currentMapData || !currentMapData.nodes) return;
 
             const width = window.innerWidth;
             const height = window.innerHeight;
-            console.log('📐 Canvas size:', width, 'x', height);
             
             const colorScale = d3.scaleOrdinal([
                 '#667eea', '#764ba2', '#f093fb', '#f5576c', 
@@ -737,127 +780,131 @@ app.get('/embed', (req, res) => {
             const svg = d3.select("svg").attr("viewBox", [0, 0, width, height]);
             svg.selectAll("*").remove();
 
-            const defs = svg.append("defs");
-            
-            // Add glow filter
-            const nodeGlow = defs.append("filter").attr("id", "nodeGlow")
-                .attr("x", "-50%").attr("y", "-50%").attr("width", "200%").attr("height", "200%");
-            nodeGlow.append("feGaussianBlur").attr("stdDeviation", "3").attr("result", "coloredBlur");
-            const nodeMerge = nodeGlow.append("feMerge");
-            nodeMerge.append("feMergeNode").attr("in", "coloredBlur");
-            nodeMerge.append("feMergeNode").attr("in", "SourceGraphic");
-
-            // Add link gradient
-            const linkGradient = defs.append("linearGradient").attr("id", "linkGradient");
-            linkGradient.append("stop").attr("offset", "0%").attr("stop-color", "#667eea").attr("stop-opacity", 0.8);
-            linkGradient.append("stop").attr("offset", "100%").attr("stop-color", "#764ba2").attr("stop-opacity", 0.4);
-
             const container = svg.append("g");
             const zoom = d3.zoom().scaleExtent([0.1, 4])
                 .on("zoom", ({transform}) => container.attr("transform", transform));
             svg.call(zoom);
 
-            // Create simulation
             simulation = d3.forceSimulation(currentMapData.nodes)
                 .force("link", d3.forceLink(currentMapData.links).id(d => d.id).distance(120))
                 .force("charge", d3.forceManyBody().strength(-400))
                 .force("center", d3.forceCenter(width / 2, height / 2));
 
-            // Create links
             const link = container.append("g").selectAll("line")
                 .data(currentMapData.links).join("line")
-                .attr("stroke", "url(#linkGradient)")
+                .attr("stroke", "#667eea")
                 .attr("stroke-width", 2).attr("stroke-opacity", 0.6);
 
-            // Create nodes
             const node = container.append("g").selectAll("circle")
                 .data(currentMapData.nodes).join("circle")
                 .attr("r", 15).attr("fill", d => colorScale(d.group))
-                .attr("stroke", "#ffffff").attr("stroke-width", 2)
-                .style("cursor", "pointer");
+                .attr("stroke", "#ffffff").attr("stroke-width", 2);
 
-            // Create labels
             const label = container.append("g").selectAll("text")
                 .data(currentMapData.nodes).join("text")
                 .text(d => d.id).attr("text-anchor", "middle")
                 .attr("fill", "#ffffff").attr("font-size", "11px")
                 .style("pointer-events", "none");
 
-            // Simulation tick
             simulation.on("tick", () => {
                 link.attr("x1", d => d.source.x).attr("y1", d => d.source.y)
                     .attr("x2", d => d.target.x).attr("y2", d => d.target.y);
                 node.attr("cx", d => d.x).attr("cy", d => d.y);
                 label.attr("x", d => d.x).attr("y", d => d.y + 25);
             });
-            
-            console.log('✅ Visualization initialized successfully');
         }
 
         window.addEventListener('resize', () => {
             if (currentMapData) initVisualization();
         });
 
-        // Start loading
         loadMapData();
     </script>
 </body>
 </html>`;
 
-    console.log('📤 Sending embed HTML response');
     res.send(embedHTML);
 });
 
-// Also add a simple test endpoint to check if maps are available
-app.get('/api/test/maps', async (req, res) => {
+// Health check endpoint
+app.get('/health', async (req, res) => {
     try {
-        console.log('🧪 Testing maps availability...');
-        
-        const mapsData = await redisClient.hGetAll('maps:list');
-        const maps = Object.values(mapsData).map(mapStr => JSON.parse(mapStr));
-        
-        console.log(`📊 Found ${maps.length} maps in Redis`);
-        maps.forEach(map => {
-            console.log(`  - ${map.id}: ${map.name} (${map.nodeCount} nodes)`);
-        });
+        // Check Redis connection
+        await redisClient.ping();
         
         res.json({
-            status: 'success',
-            mapCount: maps.length,
-            maps: maps
+            status: 'healthy',
+            timestamp: new Date().toISOString(),
+            version: process.env.npm_package_version || '1.0.0',
+            environment: config.nodeEnv,
+            redis: 'connected'
         });
     } catch (error) {
-        console.error('❌ Error testing maps:', error);
-        res.status(500).json({ 
-            status: 'error', 
-            error: error.message 
+        res.status(503).json({
+            status: 'unhealthy',
+            timestamp: new Date().toISOString(),
+            error: error.message
         });
     }
 });
 
-// Handle 404s (must be after all routes)
+// Error handling middleware
+app.use((err, req, res, next) => {
+    log('error', 'Express error:', err.message);
+    res.status(500).json({ error: 'Internal server error' });
+});
+
+// Handle 404s
 app.use((req, res) => {
     res.status(404).json({ error: 'Not found' });
 });
 
 // Start server
 async function startServer() {
-    await connectRedis();
-    
-    app.listen(PORT, () => {
-        console.log(`🗺️  System Mapper running on http://localhost:${PORT}`);
-        console.log(`📁 Open your browser and go to: http://localhost:${PORT}`);
-        console.log('🔧 Press Ctrl+C to stop the server');
-    });
+    try {
+        await connectRedis();
+        
+        app.listen(config.port, () => {
+            log('info', `System Mapper starting...`);
+            log('info', `Environment: ${config.nodeEnv}`);
+            log('info', `Server running on http://localhost:${config.port}`);
+            log('info', `Redis: ${config.redis.host}:${config.redis.port}`);
+            log('info', 'Press Ctrl+C to stop the server');
+        });
+    } catch (error) {
+        log('error', 'Failed to start server:', error.message);
+        process.exit(1);
+    }
 }
 
-startServer().catch(console.error);
-
 // Graceful shutdown
-process.on('SIGINT', async () => {
-    console.log('\n🛑 Shutting down...');
-    await redisClient.quit();
+async function gracefulShutdown() {
+    log('info', 'Shutting down gracefully...');
+    
+    try {
+        await redisClient.quit();
+        log('info', 'Redis connection closed');
+    } catch (error) {
+        log('error', 'Error closing Redis connection:', error.message);
+    }
+    
     process.exit(0);
+}
+
+process.on('SIGINT', gracefulShutdown);
+process.on('SIGTERM', gracefulShutdown);
+
+// Handle uncaught exceptions
+process.on('uncaughtException', (error) => {
+    log('error', 'Uncaught exception:', error.message);
+    process.exit(1);
 });
+
+process.on('unhandledRejection', (error) => {
+    log('error', 'Unhandled rejection:', error.message);
+    process.exit(1);
+});
+
+startServer().catch(console.error);
 
 module.exports = app;
