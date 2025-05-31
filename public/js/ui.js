@@ -758,3 +758,165 @@ function validateMapData(data) {
 // Make functions globally available
 window.uploadMap = uploadMap;
 window.handleMapFileUpload = handleMapFileUpload;
+
+// Map Rename Functions
+// Update the initializeMapRename() function in ui.js with this enhanced version:
+
+function initializeMapRename() {
+    const mapSelector = document.getElementById('mapSelector');
+    if (mapSelector) {
+        // Remove existing listeners to avoid duplicates
+        mapSelector.removeEventListener('dblclick', startMapRename);
+        mapSelector.removeEventListener('click', handleMapRenameClick);
+        
+        // Add Ctrl+Click / Cmd+Click listener
+        mapSelector.addEventListener('click', handleMapRenameClick);
+        
+        // Add tooltip functionality
+        addRenameTooltip(mapSelector);
+    }
+}
+
+function addRenameTooltip(element) {
+    // Detect OS and set appropriate tooltip text
+    const isMac = navigator.platform.toUpperCase().indexOf('MAC') >= 0;
+    const tooltipText = isMac ? '⌘+Click to rename' : 'Ctrl+Click to rename';
+    
+    // Set the title attribute for basic tooltip
+    element.title = tooltipText;
+    
+    // Optional: Enhanced tooltip with custom styling
+    let tooltip = null;
+    
+    element.addEventListener('mouseenter', function(e) {
+        // Only show tooltip if we have a map selected
+        if (!window.currentMapId) return;
+        
+        // Create custom tooltip
+        tooltip = document.createElement('div');
+        tooltip.className = 'rename-tooltip';
+        tooltip.textContent = tooltipText;
+        document.body.appendChild(tooltip);
+        
+        // Position tooltip
+        const rect = element.getBoundingClientRect();
+        tooltip.style.left = rect.left + 'px';
+        tooltip.style.top = (rect.bottom + 5) + 'px';
+        
+        // Show tooltip
+        setTimeout(() => {
+            if (tooltip) tooltip.classList.add('show');
+        }, 100);
+    });
+    
+    element.addEventListener('mouseleave', function() {
+        if (tooltip) {
+            tooltip.classList.remove('show');
+            setTimeout(() => {
+                if (tooltip && tooltip.parentNode) {
+                    tooltip.parentNode.removeChild(tooltip);
+                }
+                tooltip = null;
+            }, 200);
+        }
+    });
+}
+
+function handleMapRenameClick(e) {
+    if (e.ctrlKey || e.metaKey) {  // Ctrl+Click (Windows) or Cmd+Click (Mac)
+        e.preventDefault();
+        e.stopPropagation();
+        startMapRename();
+    }
+}
+
+function startMapRename() {
+    if (!window.currentMapId || !window.currentMapData) {
+        showMessage('No map selected to rename', 'error');
+        return;
+    }
+
+    const mapSelector = document.getElementById('mapSelector');
+    const renameInput = document.getElementById('mapRenameInput');
+    
+    if (!mapSelector || !renameInput) return;
+
+    // Hide selector, show input
+    mapSelector.style.display = 'none';
+    renameInput.style.display = 'block';
+    renameInput.value = window.currentMapData.name;
+    
+    // Focus and select all text
+    renameInput.focus();
+    renameInput.select();
+}
+
+function handleMapRenameKeydown(event) {
+    if (event.key === 'Enter') {
+        event.preventDefault();
+        saveMapRename();
+    } else if (event.key === 'Escape') {
+        event.preventDefault();
+        cancelMapRename();
+    }
+}
+
+async function saveMapRename() {
+    const renameInput = document.getElementById('mapRenameInput');
+    const newName = renameInput.value.trim();
+    
+    if (!newName) {
+        showMessage('Map name cannot be empty', 'error');
+        return;
+    }
+    
+    if (newName === window.currentMapData.name) {
+        // No change, just cancel
+        cancelMapRename();
+        return;
+    }
+
+    try {
+        // Call API to update map name
+        await apiCall(`/api/maps/${window.currentMapId}`, {
+            method: 'PUT',
+            body: JSON.stringify({
+                name: newName,
+                description: window.currentMapData.description
+            })
+        });
+
+        // Update local data
+        window.currentMapData.name = newName;
+        
+        // Reload maps to update dropdown
+        await loadMaps();
+        
+        // Reselect current map
+        document.getElementById('mapSelector').value = window.currentMapId;
+        
+        // Hide input, show selector
+        cancelMapRename();
+        
+        showMessage(`Map renamed to "${newName}"`, 'success');
+        
+    } catch (error) {
+        console.error('Error renaming map:', error);
+        showMessage(error.message || 'Failed to rename map', 'error');
+    }
+}
+
+function cancelMapRename() {
+    const mapSelector = document.getElementById('mapSelector');
+    const renameInput = document.getElementById('mapRenameInput');
+    
+    if (mapSelector && renameInput) {
+        renameInput.style.display = 'none';
+        mapSelector.style.display = 'block';
+    }
+}
+
+// Make functions globally available
+window.handleMapRenameKeydown = handleMapRenameKeydown;
+window.cancelMapRename = cancelMapRename;
+window.handleMapRenameClick = handleMapRenameClick;  // Add this line

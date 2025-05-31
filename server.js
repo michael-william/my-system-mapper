@@ -175,6 +175,55 @@ app.delete('/api/maps/:id', async (req, res) => {
     }
 });
 
+// Update map metadata (name, description)
+app.put('/api/maps/:id', async (req, res) => {
+    try {
+        const mapId = req.params.id;
+        console.log(`📡 PUT /api/maps/${mapId} - Updating map metadata`);
+        console.log('📝 Update data:', req.body);
+        
+        const mapData = await redisClient.get(`map:${mapId}`);
+        if (!mapData) {
+            return res.status(404).json({ error: 'Map not found' });
+        }
+        
+        const map = JSON.parse(mapData);
+        
+        // Update allowed fields
+        if (req.body.name !== undefined) {
+            map.name = req.body.name;
+        }
+        if (req.body.description !== undefined) {
+            map.description = req.body.description;
+        }
+        
+        map.updated = new Date().toISOString();
+        
+        // Save updated map
+        await redisClient.set(`map:${mapId}`, JSON.stringify(map));
+        
+        // Update metadata in maps list
+        await redisClient.hSet('maps:list', mapId, JSON.stringify({
+            id: mapId,
+            name: map.name,
+            description: map.description,
+            nodeCount: map.nodes.length,
+            updated: map.updated
+        }));
+        
+        console.log('✅ Map metadata updated:', mapId);
+        res.json({
+            id: mapId,
+            name: map.name,
+            description: map.description,
+            updated: map.updated
+        });
+    } catch (error) {
+        console.error('❌ Error updating map:', error);
+        res.status(500).json({ error: 'Failed to update map' });
+    }
+});
+
 // Add this endpoint to your server.js file, RIGHT AFTER the existing node DELETE endpoint
 // Find this section and add the new endpoint after it:
 

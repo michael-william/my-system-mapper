@@ -42,12 +42,18 @@ async function loadMaps() {
             option.textContent = `${map.name} (${map.nodeCount} nodes)`;
             selector.appendChild(option);
         });
-        
+
         // Load the first map if available
         if (maps.length > 0) {
             selector.value = maps[0].id;
             await loadSelectedMap();
         }
+        
+        // Initialize rename functionality after maps are loaded
+        if (typeof initializeMapRename === 'function') {
+            initializeMapRename();
+        }
+        
     } catch (error) {
         showMessage('Failed to load maps', 'error');
     }

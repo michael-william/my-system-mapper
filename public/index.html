@@ -33,9 +33,12 @@
             
             <!-- Map Selector -->
             <div class="map-selector">
-                <select class="map-select" id="mapSelector" onchange="loadSelectedMap()">
-                    <option value="">Loading maps...</option>
-                </select>
+                <div class="map-select-container">
+                    <select class="map-select" id="mapSelector" onchange="loadSelectedMap()">
+                        <option value="">Loading maps...</option>
+                    </select>
+                    <input type="text" class="map-rename-input" id="mapRenameInput" style="display: none;" onkeydown="handleMapRenameKeydown(event)" onblur="cancelMapRename()">
+                </div>
                 <div class="map-actions">
                     <button class="map-action-btn" onclick="createNewMap()">Create</button>
                     <button class="map-action-btn" onclick="uploadMap()">Upload</button>

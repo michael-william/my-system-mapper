@@ -1656,6 +1656,107 @@ body.dark .canvas-area {
     max-width: 100%;
 }
 
+.map-select-container {
+    position: relative;
+    width: 100%;
+}
+
+.map-rename-input {
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    padding: 8px 12px;
+    border: 1px solid rgba(102, 126, 234, 0.3);
+    border-radius: 6px;
+    background: rgba(255, 255, 255, 0.05);
+    backdrop-filter: blur(10px);
+    color: #e5e5e5;
+    font-size: 14px;
+    font-family: inherit;
+    box-sizing: border-box;
+    z-index: 10;
+}
+
+.map-rename-input:focus {
+    outline: none;
+    border-color: rgba(102, 126, 234, 0.8);
+    box-shadow: 0 0 0 3px rgba(102, 126, 234, 0.2);
+    background: rgba(255, 255, 255, 0.1);
+}
+
+/* Replace the .map-rename-input styles in your custom.css with this: */
+
+.map-rename-input {
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    padding: 8px 12px;
+    border: 1px solid rgba(102, 126, 234, 0.3);
+    border-radius: 6px;
+    background: rgba(255, 255, 255, 0.05);
+    backdrop-filter: blur(10px);
+    color: #e5e5e5;
+    font-size: 14px;
+    font-family: inherit;
+    box-sizing: border-box;
+    z-index: 10;
+    
+    /* Match the select box styling exactly */
+    margin-bottom: 8px;           /* Same as .map-select */
+    min-height: 40px;             /* Ensure consistent height */
+    line-height: normal;          /* Reset line-height */
+    vertical-align: top;          /* Align properly */
+}
+
+.map-rename-input:focus {
+    outline: none;
+    border-color: rgba(102, 126, 234, 0.8);
+    box-shadow: 0 0 0 3px rgba(102, 126, 234, 0.2);
+    background: rgba(255, 255, 255, 0.1);
+}
+
+/* Ensure the container has proper positioning */
+.map-select-container {
+    position: relative;
+    width: 100%;
+    margin-bottom: 8px;           /* Match .map-select margin */
+}
+
+/* Add these styles to your custom.css for the rename tooltip */
+
+.rename-tooltip {
+    position: fixed;
+    background: rgba(0, 0, 0, 0.9);
+    color: white;
+    padding: 6px 10px;
+    border-radius: 4px;
+    font-size: 12px;
+    font-weight: 500;
+    pointer-events: none;
+    z-index: 1000;
+    opacity: 0;
+    transform: translateY(-5px);
+    transition: all 0.2s ease;
+    white-space: nowrap;
+    border: 1px solid rgba(102, 126, 234, 0.5);
+    backdrop-filter: blur(10px);
+}
+
+.rename-tooltip.show {
+    opacity: 1;
+    transform: translateY(0);
+}
+
+/* Dark mode compatibility */
+body.dark .rename-tooltip {
+    background: rgba(26, 26, 46, 0.95);
+    border: 1px solid rgba(102, 126, 234, 0.6);
+}
+
 /* Responsive adjustments */
 @media (max-width: 640px) {
     #shareModal .modal {
