@@ -591,3 +591,140 @@ window.updateEmbedCode = updateEmbedCode;
 function saveMap() {
     showMessage('Map saved automatically!');
 }
+
+// Upload Functions
+function uploadMap() {
+    const fileInput = document.getElementById('mapFileInput');
+    if (!fileInput) {
+        showMessage('Upload not available', 'error');
+        return;
+    }
+    
+    // Reset the input to allow re-uploading the same file
+    fileInput.value = '';
+    fileInput.click();
+}
+
+async function handleMapFileUpload(event) {
+    const file = event.target.files[0];
+    if (!file) return;
+    
+    // Validate file type
+    if (!file.name.toLowerCase().endsWith('.json')) {
+        showMessage('Please select a JSON file', 'error');
+        return;
+    }
+    
+    // Validate file size (10MB limit)
+    const maxSize = 10 * 1024 * 1024; // 10MB
+    if (file.size > maxSize) {
+        showMessage('File too large. Maximum size is 10MB', 'error');
+        return;
+    }
+    
+    try {
+        showMessage('Uploading map...', 'success');
+        
+        // Read file content
+        const fileContent = await readFileAsText(file);
+        
+        // Parse and validate JSON
+        let mapData;
+        try {
+            mapData = JSON.parse(fileContent);
+        } catch (parseError) {
+            throw new Error('Invalid JSON file format');
+        }
+        
+        // Validate map structure
+        const validationResult = validateMapData(mapData);
+        if (!validationResult.valid) {
+            throw new Error(`Invalid map structure: ${validationResult.error}`);
+        }
+        
+        // Create new map using existing API
+        const newMap = await apiCall('/api/maps', {
+            method: 'POST',
+            body: JSON.stringify({
+                name: mapData.name || `Uploaded Map - ${new Date().toLocaleDateString()}`,
+                description: mapData.description || 'Uploaded from JSON file',
+                nodes: mapData.nodes,
+                links: mapData.links
+            })
+        });
+        
+        // Reload maps and select the new one
+        await loadMaps();
+        document.getElementById('mapSelector').value = newMap.id;
+        await loadSelectedMap();
+        
+        showMessage(`Map "${newMap.name}" uploaded successfully!`, 'success');
+        
+    } catch (error) {
+        console.error('Upload error:', error);
+        showMessage(error.message || 'Failed to upload map', 'error');
+    }
+}
+
+// Helper function to read file as text
+function readFileAsText(file) {
+    return new Promise((resolve, reject) => {
+        const reader = new FileReader();
+        reader.onload = (e) => resolve(e.target.result);
+        reader.onerror = () => reject(new Error('Failed to read file'));
+        reader.readAsText(file);
+    });
+}
+
+// Validate map data structure
+function validateMapData(data) {
+    if (!data || typeof data !== 'object') {
+        return { valid: false, error: 'Data must be an object' };
+    }
+    
+    // Check for required fields
+    if (!Array.isArray(data.nodes)) {
+        return { valid: false, error: 'Missing or invalid "nodes" array' };
+    }
+    
+    if (!Array.isArray(data.links)) {
+        return { valid: false, error: 'Missing or invalid "links" array' };
+    }
+    
+    // Validate nodes structure
+    for (let i = 0; i < data.nodes.length; i++) {
+        const node = data.nodes[i];
+        if (!node.id || typeof node.id !== 'string') {
+            return { valid: false, error: `Node ${i + 1} missing required "id" field` };
+        }
+    }
+    
+    // Validate links structure
+    for (let i = 0; i < data.links.length; i++) {
+        const link = data.links[i];
+        if (!link.source || !link.target) {
+            return { valid: false, error: `Link ${i + 1} missing "source" or "target" field` };
+        }
+    }
+    
+    // Check if all link references point to existing nodes
+    const nodeIds = new Set(data.nodes.map(n => n.id));
+    for (let i = 0; i < data.links.length; i++) {
+        const link = data.links[i];
+        const sourceId = link.source.id || link.source;
+        const targetId = link.target.id || link.target;
+        
+        if (!nodeIds.has(sourceId)) {
+            return { valid: false, error: `Link ${i + 1} references non-existent source node: ${sourceId}` };
+        }
+        if (!nodeIds.has(targetId)) {
+            return { valid: false, error: `Link ${i + 1} references non-existent target node: ${targetId}` };
+        }
+    }
+    
+    return { valid: true };
+}
+
+// Make functions globally available
+window.uploadMap = uploadMap;
+window.handleMapFileUpload = handleMapFileUpload;
