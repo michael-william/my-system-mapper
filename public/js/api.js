@@ -10,16 +10,16 @@ async function apiCall(url, options = {}) {
             },
             ...options
         });
-
+        
         if (!response.ok) {
             const error = await response.json();
             throw new Error(error.error || 'API call failed');
         }
-
+        
         if (response.status === 204) {
             return null; // No content
         }
-
+        
         return await response.json();
     } catch (error) {
         console.error('API Error:', error);
@@ -42,7 +42,7 @@ async function loadMaps() {
             option.textContent = `${map.name} (${map.nodeCount} nodes)`;
             selector.appendChild(option);
         });
-
+        
         // Load the first map if available
         if (maps.length > 0) {
             selector.value = maps[0].id;
@@ -63,7 +63,7 @@ async function loadSelectedMap() {
         clearVisualization();
         return;
     }
-
+    
     try {
         window.currentMapData = await apiCall(`/api/maps/${mapId}`);
         window.currentMapId = mapId;
@@ -79,7 +79,7 @@ async function loadSelectedMap() {
 async function createNewMap() {
     const name = prompt('Enter map name:');
     if (!name) return;
-
+    
     try {
         const newMap = await apiCall('/api/maps', {
             method: 'POST',
@@ -88,7 +88,7 @@ async function createNewMap() {
                 description: 'New system map'
             })
         });
-
+        
         await loadMaps();
         document.getElementById('mapSelector').value = newMap.id;
         await loadSelectedMap();
@@ -103,14 +103,14 @@ async function deleteCurrentMap() {
         showMessage('No map selected', 'error');
         return;
     }
-
+    
     if (!confirm(`Are you sure you want to delete "${window.currentMapData.name}"?`)) return;
-
+    
     try {
         await apiCall(`/api/maps/${window.currentMapId}`, {
             method: 'DELETE'
         });
-
+        
         await loadMaps();
         showMessage('Map deleted successfully!');
     } catch (error) {
@@ -124,11 +124,11 @@ async function saveNode() {
         showMessage('No map selected', 'error');
         return;
     }
-
+    
     const parentNodeValues = Array.from(document.querySelectorAll('.parent-node-select'))
-        .map(sel => sel.value)
-        .filter(val => val);
-
+    .map(sel => sel.value)
+    .filter(val => val);
+    
     const nodeData = {
         id: document.getElementById('nodeName').value,
         group: document.getElementById('nodeType').value,
@@ -136,7 +136,7 @@ async function saveNode() {
         parentNodes: parentNodeValues,
         attributes: []
     };
-
+    
     // Collect custom attributes
     document.querySelectorAll('#attributesList .attribute-item').forEach(item => {
         const nameInput = item.querySelector('.attribute-name-input');
@@ -148,32 +148,32 @@ async function saveNode() {
             });
         }
     });
-
+    
     if (!nodeData.id) {
         showMessage('Please enter a node name', 'error');
         return;
     }
-
+    
     try {
         await apiCall(`/api/maps/${window.currentMapId}/nodes`, {
             method: 'POST',
             body: JSON.stringify(nodeData)
         });
-
+        
         // Reload the map to get updated data
         await loadSelectedMap();
-
+        
         // Clear form fields
         document.getElementById('nodeName').value = '';
         document.getElementById('nodeType').value = '';
         document.getElementById('nodeDescription').value = '';
         document.querySelectorAll('.parent-node-select').forEach(select => select.value = '');
         document.getElementById('attributesList').innerHTML = '';
-
+        
         showMessage('Node added successfully!');
-    } catch (error) {
-        showMessage('Failed to add node', 'error');
-    }
+        } catch (error) {
+            showMessage(error.message || 'Failed to add node', 'error');
+        }
 }
 
 async function saveEditedNode() {
@@ -183,18 +183,18 @@ async function saveEditedNode() {
         showMessage('Please select a node to edit', 'error');
         return;
     }
-
+    
     try {
         // Get updated values
         const newNodeName = document.getElementById('editNodeName').value;
         const newNodeType = document.getElementById('editNodeType').value;
         const newNodeDescription = document.getElementById('editNodeDescription').value; 
-
+        
         // Collect parent nodes
         const newParentNodes = Array.from(document.querySelectorAll('.edit-parent-node-select'))
-            .map(select => select.value)
-            .filter(value => value);
-
+        .map(select => select.value)
+        .filter(value => value);
+        
         // Collect attributes
         const attributes = [];
         document.getElementById('editAttributesList').querySelectorAll('.attribute-item').forEach(item => {
@@ -207,19 +207,19 @@ async function saveEditedNode() {
                 });
             }
         });
-
+        
         if (!newNodeName) {
             showMessage('Please enter a node name', 'error');
             return;
         }
-
+        
         // Debug logging
         console.log('🔧 Editing node:', originalNodeId);
         console.log('🔧 New name:', newNodeName);
         console.log('🔧 New type:', newNodeType);
         console.log('🔧 New parent nodes:', newParentNodes);
         console.log('🔧 New attributes:', attributes);
-
+        
         // Check if name changed and if new name already exists
         if (newNodeName !== originalNodeId) {
             const nameExists = window.currentMapData.nodes.find(n => n.id === newNodeName && n.id !== originalNodeId);
@@ -227,13 +227,13 @@ async function saveEditedNode() {
                 showMessage('A node with this name already exists', 'error');
                 return;
             }
-
+            
             console.log('🔄 Node name changed, will delete and recreate');
             // If name changed, delete old and create new
             await apiCall(`/api/maps/${window.currentMapId}/nodes/${originalNodeId}`, {
                 method: 'DELETE'
             });
-
+            
             await apiCall(`/api/maps/${window.currentMapId}/nodes`, {
                 method: 'POST',
                 body: JSON.stringify({
@@ -262,7 +262,7 @@ async function saveEditedNode() {
                 body: JSON.stringify(updateData)
             });
         }
-
+        
         console.log('✅ Node update completed, reloading map');
         await loadSelectedMap();
         updateEditNodeOptions();
@@ -272,10 +272,10 @@ async function saveEditedNode() {
         populateEditNodeForm();
         
         showMessage('Node updated successfully!');
-    } catch (error) {
-        console.error('❌ Error in saveEditedNode:', error);
-        showMessage('Failed to update node', 'error');
-    }
+        } catch (error) {
+            console.error('❌ Error in saveEditedNode:', error);
+            showMessage(error.message || 'Failed to update node', 'error');
+        }
 }
 
 async function deleteSelectedNode() {
@@ -285,14 +285,14 @@ async function deleteSelectedNode() {
         showMessage('Please select a node to delete', 'error');
         return;
     }
-
+    
     if (!confirm(`Are you sure you want to delete the node "${selectedId}"?`)) return;
-
+    
     try {
         await apiCall(`/api/maps/${window.currentMapId}/nodes/${selectedId}`, {
             method: 'DELETE'
         });
-
+        
         await loadSelectedMap();
         editNodeSelect.value = '';
         document.getElementById('editAttributesList').innerHTML = '';
